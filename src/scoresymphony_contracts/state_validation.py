@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 from typing import Final
+from uuid import UUID
 
-from .models import ContractRejection, JsonObject, RejectionCode
+from .models import ContractRejection, JsonObject, JsonValue, RejectionCode
 
 
 TASK_REQUIRED_COMMANDS: Final = frozenset(
@@ -47,14 +48,30 @@ def _invalid_state(message: str, path: str) -> ContractRejection:
     return ContractRejection(RejectionCode.INVALID_STATE, message, path)
 
 
+def _identifier_is_well_formed(value: JsonValue) -> bool:
+    if value is None:
+        return True
+    if not isinstance(value, str):
+        return False
+    try:
+        UUID(value)
+    except ValueError:
+        return False
+    return True
+
+
 def command_state_rejection(message: JsonObject) -> ContractRejection | None:
     command = message.get("command")
     if not isinstance(command, str):
         return None
     task_id = message.get("task_id")
     run_id = message.get("run_id")
+    if not _identifier_is_well_formed(task_id) or not _identifier_is_well_formed(run_id):
+        return None
     if command == "create_task" and task_id is not None:
         return _invalid_state("create_task cannot target an existing task", "task_id")
+    if command == "create_task" and run_id is not None:
+        return _invalid_state("create_task cannot target an existing run", "run_id")
     if command in TASK_REQUIRED_COMMANDS and task_id is None:
         return _invalid_state(f"{command} requires task_id", "task_id")
     if command in RUN_REQUIRED_COMMANDS and run_id is None:
@@ -70,6 +87,8 @@ def _event_identifier_rejection(message: JsonObject) -> ContractRejection | None
         return None
     task_id = message.get("task_id")
     run_id = message.get("run_id")
+    if not _identifier_is_well_formed(task_id) or not _identifier_is_well_formed(run_id):
+        return None
     if event_type in TASK_EVENTS:
         if task_id is None:
             return _invalid_state(f"{event_type} requires task_id", "task_id")

@@ -158,6 +158,49 @@ def test_parse_event_when_discriminator_is_not_text_returns_structured_rejection
 
 
 @pytest.mark.parametrize(
+    ("field", "malformed"),
+    [
+        ("task_id", []),
+        ("task_id", "not-a-uuid"),
+        ("run_id", []),
+        ("run_id", "not-a-uuid"),
+    ],
+)
+def test_parse_create_task_when_optional_identifier_is_malformed_rejects_identifier(
+    field: str,
+    malformed: str | list[object],
+) -> None:
+    # Given
+    raw = valid_create_task()
+    raw[field] = malformed
+
+    # When
+    result = parse_command(raw)
+
+    # Then
+    assert isinstance(result, ContractRejection)
+    assert result.code is RejectionCode.INVALID_IDENTIFIER
+    assert result.path == field
+
+
+@pytest.mark.parametrize("malformed", [[], "not-a-uuid"])
+def test_parse_task_event_when_forbidden_run_identifier_is_malformed_rejects_identifier(
+    malformed: str | list[object],
+) -> None:
+    # Given
+    raw = valid_event()
+    raw["run_id"] = malformed
+
+    # When
+    result = parse_event(raw)
+
+    # Then
+    assert isinstance(result, ContractRejection)
+    assert result.code is RejectionCode.INVALID_IDENTIFIER
+    assert result.path == "run_id"
+
+
+@pytest.mark.parametrize(
     ("command", "task_id", "run_id"),
     [
         ("run_tests", TASK_ID, None),
@@ -165,6 +208,7 @@ def test_parse_event_when_discriminator_is_not_text_returns_structured_rejection
         ("cancel_run", TASK_ID, None),
         ("merge_task", TASK_ID, None),
         ("create_task", TASK_ID, None),
+        ("create_task", None, RUN_ID),
     ],
 )
 def test_parse_command_when_identifier_state_is_invalid_rejects_semantics(
