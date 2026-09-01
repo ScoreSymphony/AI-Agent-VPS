@@ -234,6 +234,15 @@ def test_parse_event_when_terminal_event_has_no_outcome_rejects_state(event_type
     assert result.path == "outcome"
 
 
+def test_parse_event_when_timezone_is_missing_returns_structured_rejection() -> None:
+    raw = valid_event()
+    raw["occurred_at"] = "2026-09-01T16:00:01"
+    result = parse_event(raw)
+    assert isinstance(result, ContractRejection)
+    assert result.code is RejectionCode.INVALID_TIMESTAMP
+    assert result.path == "occurred_at"
+
+
 def test_parse_event_when_terminal_event_has_no_causation_rejects_state() -> None:
     raw = valid_event()
     raw["event_type"] = "command.failed"
