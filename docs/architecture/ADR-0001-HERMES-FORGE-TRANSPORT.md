@@ -2,6 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-09-01
+- Last evidence review: 2026-09-02
 - Scope: First local integration slice only
 
 ## Context
@@ -9,87 +10,109 @@
 Hermes must remain the sole intelligent orchestrator while Forge remains the
 authoritative execution and lifecycle engine. Their first integration needs a
 stable ScoreSymphony-owned boundary that does not expose either upstream's
-internal types. `ARCHITECTURE.md` and `ROADMAP.md` prefer local HTTP/JSON with
-an event-based return path unless repository evidence shows a technical block.
+internal types.
 
-The pinned upstream snapshots provide the required building blocks:
+The pinned upstream snapshots provide the required live transport building
+blocks:
 
-- Forge already exposes an Axum HTTP API and an authenticated SSE endpoint at
-  `/api/v1/events` in `core/forge/crates/api/src/lib.rs` and
-  `core/forge/crates/api/src/routes/events.rs`.
-- Forge stores ordered domain events, correlation and causation identifiers,
-  deduplication keys, consumer cursors, leases, and projection receipts in
-  `core/forge/crates/db/src/sqlite/domain_event.rs`.
-- Hermes already exposes an HTTP API bound to `127.0.0.1` by default and has
-  structured SSE run-event handling in
-  `core/hermes/gateway/platforms/api_server.py` and
-  `core/hermes/gateway/platforms/api_server_runs.py`.
-- Hermes also has explicit transport protocols in `core/hermes/tui_gateway`,
-  so an adapter can remain outside its orchestration core.
+- Forge exposes an Axum HTTP API and an authenticated SSE endpoint at
+  `/api/v1/events`.
+- Hermes exposes an HTTP API bound to `127.0.0.1` by default and has structured
+  SSE run-event handling.
+- Hermes has explicit transport protocols, so an adapter can remain outside its
+  orchestration core.
 
-Forge's current SSE payload is an upstream event-bus representation, not the
-ScoreSymphony V1 contract. A future adapter must project persistent Forge-owned
-domain events into V1 events and support cursor-based resynchronization. This
-is an adapter requirement, not a transport blocker.
+Forge also stores ordered durable domain events, correlation/causation ids,
+consumer cursors, processing leases, and projection receipts in its database
+layer.
+
+### Evidence correction after public-surface audit
+
+The durable database facilities are not the same thing as the public Forge SSE
+surface. The current `/api/v1/events` route is backed by a broadcast event bus.
+When a consumer lags, it emits `events.resync_required`; it does not itself
+offer historical sequence replay.
+
+Therefore this ADR selects HTTP/JSON plus SSE as the **live transport**, but it
+does not claim that the current public SSE endpoint already satisfies durable
+cursor recovery. ADR-0002 records the mapping/recovery gap that must be resolved
+before the production adapter is described as reliable.
 
 ## Decision
 
-The first Hermes-Forge transport will use HTTP/JSON over an IPv4 loopback
-listener. The return path will be an SSE event stream backed by Forge-owned
-durable events and a monotonic cursor. Both directions carry only validated
-ScoreSymphony V1 messages.
+The first Hermes-Forge transport uses HTTP/JSON over an IPv4 loopback listener.
+The live return path uses SSE. Both directions carry only validated
+ScoreSymphony V1 messages at the ScoreSymphony boundary.
+
+The command plane and read/event plane are intentionally distinct:
+
+- V1 commands represent state-changing or execution-request operations.
+- Query/read concerns are not encoded as generic `get_*` command kinds.
+- Command submission returns an immediate receipt for acceptance, duplicate
+  detection, or pre-dispatch rejection.
+- A submission receipt is never a terminal execution result.
+- Terminal command events identify their originating command via
+  `causation_id`.
 
 The executable contract runtime remains transport-independent:
 
 - JSON Schema and semantic validation happen before dispatch or consumption.
-- `IntegrationContractPort` defines typed command submission and event reads.
+- `CommandSubmissionPort` defines typed command submission.
+- `EventReadPort` defines the read/recovery seam.
+- `IntegrationContractPort` composes both without merging their semantics.
 - HTTP status codes and SSE framing do not alter command or event semantics.
-- Forge adapters translate validated commands to stable Forge operations and
-  translate Forge-owned outcomes to V1 events.
-- Hermes adapters emit commands and consume events without importing Forge
-  crates, database models, routes, or event-bus types.
+- Forge adapters translate only to documented Forge lifecycle operations.
+- Hermes adapters do not import Forge crates, database models, routes, or
+  event-bus types.
+- Parsed V1 payload/data structures are recursively read-only after validation.
 
-The concrete HTTP server, authentication, durable cursor implementation, and
-both upstream adapters are intentionally outside this work package.
+The exact durable recovery implementation is intentionally deferred to
+ADR-0002. A current-state REST resynchronization can be used in a limited
+vertical-slice spike, but it must not be described as durable event replay.
 
 ## Security boundary
 
-The initial listener must bind only to `127.0.0.1`. Moving beyond loopback
-requires a separate decision covering service identity, authentication,
-authorization, replay protection, TLS, rate limits, and secret redaction.
-Loopback placement is not treated as authentication.
+The initial ScoreSymphony listener must bind only to `127.0.0.1`. Forge's own
+non-exempt API routes require authentication. Moving either service beyond
+loopback requires a separate decision covering service identity,
+authentication, authorization, replay protection, TLS, rate limits, and secret
+redaction. Loopback placement is not treated as authentication.
 
 ## Alternatives considered
 
 ### MCP first
 
-Both components have MCP-related code, but MCP would add protocol negotiation
-and tool discovery before the lifecycle contract is proven. It remains a
-possible later adapter over the same V1 models.
+MCP would add protocol negotiation and tool discovery before the lifecycle
+contract is proven. It remains a possible later adapter over the same V1
+models.
 
 ### Direct Python or Rust imports
 
-Rejected because they would couple Hermes to unstable Forge internals and
-erase the process and license boundary.
+Rejected for the Hermes/ScoreSymphony integration boundary because they would
+couple orchestration to Forge internals and erase the intended process
+boundary.
 
 ### Stdio JSON-RPC
 
 Rejected for the first slice because Forge already has an HTTP service and SSE
-surface. Stdio would require additional process supervision and a separate
-event fan-out mechanism without improving contract semantics.
+surface. Stdio adds process supervision and event fan-out without improving
+contract semantics.
 
 ### Polling only
 
-Rejected as the primary return path because it increases latency and load.
-Cursor-based reads remain the required recovery path after disconnects or SSE
-overflow.
+Rejected as the primary live path because it increases latency and load.
+Explicit read/snapshot operations remain valid recovery tools after disconnect
+or SSE overflow.
 
 ## Consequences
 
-- The transport choice is compatible with both pinned upstreams and follows
-  the documented preferred architecture.
-- The V1 runtime can be tested without starting either upstream.
-- No second task, run, worktree, review, merge, or orchestration state is
-  introduced by the integration layer.
+- Loopback HTTP/JSON plus SSE remains the chosen live transport.
+- A successful HTTP submission does not imply successful command execution.
+- Current Forge SSE is suitable for live notification, not by itself for
+  durable historical replay.
+- Durable recovery must be implemented through a verified public Forge surface
+  or explicitly downgraded to snapshot resynchronization for the first spike.
+- No second task, execution, worktree, review, gate, merge, or orchestration
+  state may be introduced by the integration layer.
 - Production exposure, adapter mappings, durable delivery, and recovery remain
   explicit follow-up work and must not be described as operational yet.

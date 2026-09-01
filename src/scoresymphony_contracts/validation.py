@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import re
 from collections.abc import Callable
 from datetime import datetime
 from typing import TypeAlias, assert_never
@@ -51,6 +50,29 @@ def _missing_required_field(
     )
 
 
+def _timezone_rejection(message: JsonObject) -> ContractRejection | None:
+    """Reject ISO timestamps that parse but do not identify an absolute instant."""
+    for field in ("issued_at", "occurred_at"):
+        raw = message.get(field)
+        if not isinstance(raw, str):
+            continue
+        try:
+            value = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+        except ValueError:
+            return ContractRejection(
+                RejectionCode.INVALID_TIMESTAMP,
+                f"invalid timestamp: {field}",
+                field,
+            )
+        if value.tzinfo is None or value.utcoffset() is None:
+            return ContractRejection(
+                RejectionCode.INVALID_TIMESTAMP,
+                f"timestamp must include timezone: {field}",
+                field,
+            )
+    return None
+
+
 def _validate(
     raw: JsonValue,
     validator: Draft202012Validator,
@@ -77,6 +99,9 @@ def _validate(
             )
             if errors:
                 return schema_rejection(errors[0])
+            timezone_rejection = _timezone_rejection(message)
+            if timezone_rejection is not None:
+                return timezone_rejection
             return message
         case _:
             return ContractRejection(
@@ -123,11 +148,9 @@ def _optional_uuid(data: JsonObject, field: str) -> UUID | None:
 
 
 def _timestamp(data: JsonObject, field: str) -> datetime:
-    text_value = _text(data, field)
-    # Validate that timestamp has timezone info (Z or +/-HH:MM)
-    if not (text_value.endswith('Z') or '+' in text_value[-6:] or '-' in text_value[-6:]):
+    value = datetime.fromisoformat(_text(data, field).replace("Z", "+00:00"))
+    if value.tzinfo is None or value.utcoffset() is None:
         raise TypeError(f"validated field {field} has no timezone")
-    value = datetime.fromisoformat(text_value.replace("Z", "+00:00"))
     return value
 
 
@@ -136,42 +159,26 @@ def _actor(data: JsonObject) -> Actor:
     return Actor(type=ActorType(_text(actor, "type")), id=_text(actor, "id"))
 
 
-def _extract_field_name(error_message: str) -> str | None:
-    """Extract field name from TypeError message."""
-    match = re.search(r"validated field (\w+)", error_message)
-    return match.group(1) if match else None
-
-
 def parse_command(raw: JsonValue) -> CommandV1 | ContractRejection:
     validated = _validate(raw, COMMAND_VALIDATOR, command_state_rejection)
     if isinstance(validated, ContractRejection):
         return validated
-    try:
-        idempotency = _object(validated, "idempotency")
-        return CommandV1(
-            command_id=UUID(_text(validated, "command_id")),
-            command=CommandKind(_text(validated, "command")),
-            actor=_actor(validated),
-            task_id=_optional_uuid(validated, "task_id"),
-            run_id=_optional_uuid(validated, "run_id"),
-            correlation_id=UUID(_text(validated, "correlation_id")),
-            issued_at=_timestamp(validated, "issued_at"),
-            idempotency=Idempotency(
-                key=_text(idempotency, "key"),
-                scope=_text(idempotency, "scope"),
-                replay_policy=_text(idempotency, "replay_policy"),
-            ),
-            payload=readonly_json(_object(validated, "payload")),
-        )
-    except TypeError as e:
-        error_msg = str(e)
-        field = _extract_field_name(error_msg)
-        # Determine rejection code based on error type
-        if "has no timezone" in error_msg:
-            code = RejectionCode.INVALID_TIMESTAMP
-        else:
-            code = RejectionCode.SCHEMA_VIOLATION
-        return ContractRejection(code, error_msg, field or "$")
+    idempotency = _object(validated, "idempotency")
+    return CommandV1(
+        command_id=UUID(_text(validated, "command_id")),
+        command=CommandKind(_text(validated, "command")),
+        actor=_actor(validated),
+        task_id=_optional_uuid(validated, "task_id"),
+        execution_id=_optional_uuid(validated, "execution_id"),
+        correlation_id=UUID(_text(validated, "correlation_id")),
+        issued_at=_timestamp(validated, "issued_at"),
+        idempotency=Idempotency(
+            key=_text(idempotency, "key"),
+            scope=_text(idempotency, "scope"),
+            replay_policy=_text(idempotency, "replay_policy"),
+        ),
+        payload=readonly_json(_object(validated, "payload")),
+    )
 
 
 def _outcome(data: JsonObject) -> Success | Rejected | Failed | None:
@@ -204,26 +211,16 @@ def parse_event(raw: JsonValue) -> EventV1 | ContractRejection:
     validated = _validate(raw, EVENT_VALIDATOR, event_state_rejection)
     if isinstance(validated, ContractRejection):
         return validated
-    try:
-        return EventV1(
-            event_id=UUID(_text(validated, "event_id")),
-            event_type=EventType(_text(validated, "event_type")),
-            sequence=_integer(validated, "sequence"),
-            occurred_at=_timestamp(validated, "occurred_at"),
-            actor=_actor(validated),
-            task_id=_optional_uuid(validated, "task_id"),
-            run_id=_optional_uuid(validated, "run_id"),
-            correlation_id=UUID(_text(validated, "correlation_id")),
-            causation_id=_optional_uuid(validated, "causation_id"),
-            data=readonly_json(_object(validated, "data")),
-            outcome=_outcome(validated),
-        )
-    except TypeError as e:
-        error_msg = str(e)
-        field = _extract_field_name(error_msg)
-        # Determine rejection code based on error type
-        if "has no timezone" in error_msg:
-            code = RejectionCode.INVALID_TIMESTAMP
-        else:
-            code = RejectionCode.SCHEMA_VIOLATION
-        return ContractRejection(code, error_msg, field or "$")
+    return EventV1(
+        event_id=UUID(_text(validated, "event_id")),
+        event_type=EventType(_text(validated, "event_type")),
+        sequence=_integer(validated, "sequence"),
+        occurred_at=_timestamp(validated, "occurred_at"),
+        actor=_actor(validated),
+        task_id=_optional_uuid(validated, "task_id"),
+        execution_id=_optional_uuid(validated, "execution_id"),
+        correlation_id=UUID(_text(validated, "correlation_id")),
+        causation_id=_optional_uuid(validated, "causation_id"),
+        data=readonly_json(_object(validated, "data")),
+        outcome=_outcome(validated),
+    )

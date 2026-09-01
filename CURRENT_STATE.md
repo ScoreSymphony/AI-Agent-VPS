@@ -1,65 +1,78 @@
 # Current state
 
-Updated: 2026-09-01
+Updated: 2026-09-02
 
 ## Current objective
 
-Provide an executable, transport-independent V1 contract runtime as the stable
-boundary for later Hermes-Forge adapters.
+Finish the verified V1 boundary and provide the minimum Forge public recovery
+surface required before the first production-quality Hermes-Forge adapter.
 
-## Implemented in this baseline
+## Implemented in this branch
 
-- The repository boundary is fixed to `ScoreSymphony/AI-Agent-VPS`.
-- Forge is imported as a pinned MIT source snapshot.
-- Hermes Agent is imported from a pinned source snapshot with documented
-  non-MIT paths excluded from the vendored core.
-- Upstream provenance and third-party notices are recorded.
-- Hermes is defined as the sole intelligent orchestrator.
-- Forge is defined as the deterministic execution/lifecycle engine.
-- Component classes and the first managed-external registry entry are defined.
-- Version 1 command and event schemas are present.
-- V1 commands and events have frozen, typed executable Python envelopes.
-- Central validation returns deterministic structured rejections for unknown
-  versions, missing fields, malformed identifiers, invalid timestamps, and
-  invalid command/event states.
-- Command results distinguish success, deterministic rejection, and execution
-  failure.
-- A transport-independent adapter protocol is present.
-- ADR-0001 selects loopback HTTP/JSON with an SSE return path for the first
-  adapter slice based on the pinned Forge and Hermes code.
-- Baseline validation, tests, and a CI workflow are present.
-- A read-only upstream update checker is present.
+- Hermes remains the sole intelligent orchestrator.
+- Forge remains the deterministic task, execution, workspace, review, gate, and
+  merge authority.
+- V1 command submission is separated from terminal command outcomes through
+  `CommandReceipt` and terminal `command.*` events.
+- Read/query concerns are separated from the command plane.
+- Parsed nested contract data is recursively read-only after validation.
+- Terminal command events require command causation.
+- ADR-0001 accurately describes HTTP/JSON + SSE as the live transport without
+  claiming the current SSE feed already provides durable historical replay.
+- ADR-0002 is accepted and aligns V1 to verified Forge lifecycle operations.
+- `create_task` carries explicit Forge `project_id` scope.
+- Task mutations carry the expected Forge task `version`.
+- `run_id` and run-oriented commands/events are replaced by Forge
+  `execution_id` / execution terminology.
+- Commands that would bypass or duplicate Forge workspace, test, review, worker,
+  or merge authority are removed from V1.
+- Contract fixtures, compatibility checks, semantic rejection tests, and runtime
+  tests cover the corrected vocabulary.
+- Baseline validation, Pytest, packaging checks, and GitHub Actions definitions
+  remain present.
+
+## Verified integration facts
+
+- Forge task creation is project-scoped.
+- Forge task updates and task actions support optimistic concurrency.
+- Forge owns task start/dispatch, workspace creation, review/gates, and merge.
+- Forge execution retry/cancel has public execution endpoints.
+- Forge live events include task, workspace, execution, review, and merge
+  lifecycle information that can be normalized into V1.
+- Forge `/api/v1/events` is a broadcast SSE stream and signals
+  `events.resync_required` on lag.
+- Forge internally persists ordered domain events and consumer cursors, but no
+  equivalent public historical cursor-read endpoint exists yet.
 
 ## Not implemented yet
 
-- Running HTTP/SSE transport and both Hermes/Forge adapters.
-- Shared task/run/event persistence across both engines.
-- The minimal shell-worker vertical slice.
-- Integrated authentication and authorization.
-- Production deployment and reverse proxy configuration.
-- ScoreSymphony dashboard extensions.
-- Managed-external installation and removal.
-- Qwen Code installation or model configuration.
-- Research, file, infrastructure, monitoring, and deployment agents.
-- KVM 4/KVM 8 placement.
+- Authenticated public Forge historical domain-event read/recovery endpoint.
+- Running ScoreSymphony command HTTP endpoint and SSE projection adapter.
+- Durable command idempotency integration against Forge-owned state/events.
+- Hermes-side V1 tools/adapter.
+- Minimal shell-worker end-to-end vertical slice.
+- Production authentication/authorization design beyond existing Forge auth.
+- Deployment, Control Plane, agent registry, managed externals, specialist
+  agents, and KVM placement.
 
 ## Next work package
 
-Implement the smallest Forge adapter and loopback HTTP/SSE boundary against
-`platform/contracts/v1`, without adding Hermes orchestration behavior.
+Add the smallest authenticated Forge public API surface that can read ordered
+persisted domain events after a sequence cursor. Follow the nested Forge rules:
 
-## Acceptance criteria for the next work package
+1. define stable API response/query types;
+2. implement a read-only authenticated route backed by `DomainEventRepo`;
+3. cover ordering, cursor, limit, authentication, and empty-result behavior;
+4. document the endpoint in Forge API docs and changelog;
+5. update generated TypeScript types if the public DTO is exported;
+6. keep existing live `/api/v1/events` SSE behavior unchanged.
 
-- The HTTP listener binds to loopback and accepts only validated V1 commands.
-- V1 commands map to stable Forge operations without importing Forge internals
-  into Hermes.
-- Forge remains authoritative for task, run, worktree, review, and merge state.
-- Durable Forge events project to V1 events with cursor-based resynchronization.
-- Adapter success, rejection, failure, duplicate delivery, and malformed input
-  are covered by automated tests.
-- The complete sequence is covered by an automated end-to-end test.
+After that endpoint is proven, implement the ScoreSymphony adapter against the
+corrected V1 contract and the public Forge surfaces only.
 
 ## Blockers
 
-None for the baseline. Production authentication and exact transport selection
-must be decided before exposing the integration beyond localhost.
+The V1-to-Forge command mapping is no longer a blocker. Production-grade event
+recovery remains blocked until the selected authenticated historical read
+surface is implemented and tested. The PR must not be merged without a full
+repository CI pass.

@@ -14,34 +14,35 @@ SCHEMA_VERSION_V1: Final = 1
 JsonScalar: TypeAlias = str | int | float | bool | None
 JsonValue: TypeAlias = JsonScalar | list["JsonValue"] | dict[str, "JsonValue"]
 JsonObject: TypeAlias = dict[str, JsonValue]
-ReadonlyJsonObject: TypeAlias = Mapping[str, JsonValue]
+ReadonlyJsonValue: TypeAlias = (
+    JsonScalar | tuple["ReadonlyJsonValue", ...] | Mapping[str, "ReadonlyJsonValue"]
+)
+ReadonlyJsonObject: TypeAlias = Mapping[str, ReadonlyJsonValue]
 
 
 class CommandKind(StrEnum):
     CREATE_TASK = "create_task"
     UPDATE_TASK = "update_task"
-    START_WORKER = "start_worker"
-    CREATE_WORKTREE = "create_worktree"
-    INSPECT_WORKTREE = "inspect_worktree"
-    RUN_TESTS = "run_tests"
-    REQUEST_REVIEW = "request_review"
-    RETRY_RUN = "retry_run"
-    CANCEL_RUN = "cancel_run"
-    MERGE_TASK = "merge_task"
-    GET_EVENTS = "get_events"
-    GET_RESOURCES = "get_resources"
+    START_TASK = "start_task"
+    SUBMIT_TASK = "submit_task"
+    REQUEST_CHANGES_TASK = "request_changes_task"
+    APPROVE_TASK = "approve_task"
+    CANCEL_TASK = "cancel_task"
+    RETRY_EXECUTION = "retry_execution"
+    CANCEL_EXECUTION = "cancel_execution"
 
 
 class EventType(StrEnum):
     TASK_CREATED = "task.created"
     TASK_UPDATED = "task.updated"
-    WORKTREE_CREATED = "worktree.created"
-    WORKTREE_INSPECTED = "worktree.inspected"
-    RUN_STARTED = "run.started"
-    RUN_TESTS_COMPLETED = "run.tests_completed"
-    RUN_CANCELLED = "run.cancelled"
-    RUN_RETRY_SCHEDULED = "run.retry_scheduled"
-    REVIEW_REQUESTED = "review.requested"
+    TASK_STATUS_CHANGED = "task.status_changed"
+    WORKSPACE_CREATED = "workspace.created"
+    EXECUTION_STARTED = "execution.started"
+    EXECUTION_COMPLETED = "execution.completed"
+    EXECUTION_FAILED = "execution.failed"
+    EXECUTION_CANCELLED = "execution.cancelled"
+    EXECUTION_RETRY_SCHEDULED = "execution.retry_scheduled"
+    REVIEW_STARTED = "review.started"
     REVIEW_COMPLETED = "review.completed"
     TASK_MERGED = "task.merged"
     COMMAND_SUCCEEDED = "command.succeeded"
@@ -57,6 +58,12 @@ class ActorType(StrEnum):
     FORGE = "forge"
     WORKER = "worker"
     SYSTEM = "system"
+
+
+class SubmissionStatus(StrEnum):
+    ACCEPTED = "accepted"
+    DUPLICATE = "duplicate"
+    REJECTED = "rejected"
 
 
 class RejectionCode(StrEnum):
@@ -79,6 +86,17 @@ class Idempotency:
     key: str
     scope: str
     replay_policy: str
+
+
+@dataclass(frozen=True, slots=True)
+class CommandReceipt:
+    """Immediate ingress result; terminal execution results arrive as events."""
+
+    command_id: UUID
+    status: SubmissionStatus
+    code: str
+    message: str
+    details: ReadonlyJsonObject
 
 
 @dataclass(frozen=True, slots=True)
@@ -127,7 +145,7 @@ class CommandV1:
     command: CommandKind
     actor: Actor
     task_id: UUID | None
-    run_id: UUID | None
+    execution_id: UUID | None
     correlation_id: UUID
     issued_at: datetime
     idempotency: Idempotency
@@ -143,7 +161,7 @@ class EventV1:
     occurred_at: datetime
     actor: Actor
     task_id: UUID | None
-    run_id: UUID | None
+    execution_id: UUID | None
     correlation_id: UUID
     causation_id: UUID | None
     data: ReadonlyJsonObject
@@ -151,5 +169,22 @@ class EventV1:
     schema_version: int = SCHEMA_VERSION_V1
 
 
+def readonly_json_value(value: JsonValue) -> ReadonlyJsonValue:
+    match value:
+        case dict() as mapping:
+            return MappingProxyType(
+                {key: readonly_json_value(item) for key, item in mapping.items()}
+            )
+        case list() as items:
+            return tuple(readonly_json_value(item) for item in items)
+        case str() | int() | float() | bool() | None:
+            return value
+        case unreachable:
+            raise TypeError(f"unsupported JSON value: {unreachable!r}")
+
+
 def readonly_json(data: JsonObject) -> ReadonlyJsonObject:
-    return MappingProxyType(dict(data))
+    frozen = readonly_json_value(data)
+    if not isinstance(frozen, Mapping):
+        raise TypeError("JSON object must freeze to a mapping")
+    return frozen

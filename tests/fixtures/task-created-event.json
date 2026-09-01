@@ -4,16 +4,11 @@
   "sequence": 1,
   "event_type": "task.created",
   "occurred_at": "2026-09-01T16:00:01Z",
-  "actor": {
-    "type": "forge",
-    "id": "execution-engine"
-  },
+  "actor": {"type": "forge", "id": "execution-engine"},
   "task_id": "9a9a0d0d-3c62-4a4a-9ef7-80fb7b3d429c",
-  "run_id": null,
+  "execution_id": null,
   "correlation_id": "159d4955-1584-4888-b7bd-314c02a515a3",
   "causation_id": "6fd31d31-e8d9-4ac8-9f65-b7ae97976ac2",
-  "data": {
-    "state": "created"
-  },
+  "data": {"state": "created"},
   "outcome": null
 }
