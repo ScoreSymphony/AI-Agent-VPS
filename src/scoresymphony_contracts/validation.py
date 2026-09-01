@@ -143,7 +143,7 @@ def parse_command(raw: JsonValue) -> CommandV1 | ContractRejection:
         command=CommandKind(_text(validated, "command")),
         actor=_actor(validated),
         task_id=_optional_uuid(validated, "task_id"),
-        run_id=_optional_uuid(validated, "run_id"),
+        execution_id=_optional_uuid(validated, "execution_id"),
         correlation_id=UUID(_text(validated, "correlation_id")),
         issued_at=_timestamp(validated, "issued_at"),
         idempotency=Idempotency(
@@ -192,7 +192,7 @@ def parse_event(raw: JsonValue) -> EventV1 | ContractRejection:
         occurred_at=_timestamp(validated, "occurred_at"),
         actor=_actor(validated),
         task_id=_optional_uuid(validated, "task_id"),
-        run_id=_optional_uuid(validated, "run_id"),
+        execution_id=_optional_uuid(validated, "execution_id"),
         correlation_id=UUID(_text(validated, "correlation_id")),
         causation_id=_optional_uuid(validated, "causation_id"),
         data=readonly_json(_object(validated, "data")),

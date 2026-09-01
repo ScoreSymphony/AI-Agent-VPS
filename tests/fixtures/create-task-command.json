@@ -2,22 +2,14 @@
   "schema_version": 1,
   "command_id": "6fd31d31-e8d9-4ac8-9f65-b7ae97976ac2",
   "command": "create_task",
-  "actor": {
-    "type": "hermes",
-    "id": "platform-orchestrator"
-  },
+  "actor": {"type": "hermes", "id": "platform-orchestrator"},
   "task_id": null,
-  "run_id": null,
+  "execution_id": null,
   "correlation_id": "159d4955-1584-4888-b7bd-314c02a515a3",
   "issued_at": "2026-09-01T16:00:00Z",
-  "idempotency": {
-    "key": "fixture-create-task-1",
-    "scope": "command",
-    "replay_policy": "return_previous"
-  },
+  "idempotency": {"key": "fixture-create-task-1", "scope": "command", "replay_policy": "return_previous"},
   "payload": {
-    "title": "Update fixture file",
-    "worker_class": "shell",
-    "requires_review": true
+    "project_id": "2b874ced-93c6-4af9-b3ab-c5a4d3d39cec",
+    "title": "Update fixture file"
   }
 }

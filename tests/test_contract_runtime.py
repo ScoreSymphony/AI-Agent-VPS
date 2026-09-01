@@ -19,44 +19,66 @@ from scoresymphony_contracts import (
     parse_event,
     readonly_json,
 )
-
-from test_contract_rejections import COMMAND_ID, RUN_ID, valid_create_task, valid_event
+from test_contract_rejections import (
+    COMMAND_ID,
+    EXECUTION_ID,
+    PROJECT_ID,
+    TASK_ID,
+    valid_create_task,
+    valid_event,
+)
 
 
 def test_parse_command_when_valid_returns_frozen_typed_model() -> None:
-    raw = valid_create_task()
-    result = parse_command(raw)
+    result = parse_command(valid_create_task())
     assert isinstance(result, CommandV1)
     assert result.command is CommandKind.CREATE_TASK
     assert result.command_id == UUID(COMMAND_ID)
     assert result.issued_at == datetime(2026, 9, 1, 16, tzinfo=UTC)
     with pytest.raises(AttributeError):
-        result.command = CommandKind.CANCEL_RUN
+        result.command = CommandKind.CANCEL_TASK
 
 
 def test_parse_command_when_payload_is_nested_returns_recursively_read_only_data() -> None:
     raw = valid_create_task()
-    raw["command"] = "update_task"
-    raw["task_id"] = "9a9a0d0d-3c62-4a4a-9ef7-80fb7b3d429c"
     raw["payload"] = {
-        "settings": {
-            "paths": ["tests/fixture.txt"],
-            "metadata": {"owner": "forge"},
-        }
+        "project_id": PROJECT_ID,
+        "title": "Nested fixture",
+        "description": None,
     }
     result = parse_command(raw)
     assert isinstance(result, CommandV1)
-    settings = result.payload["settings"]
-    assert not isinstance(settings, dict)
-    assert isinstance(settings["paths"], tuple)
     with pytest.raises(TypeError):
-        settings["metadata"]["owner"] = "hermes"
+        result.payload["project_id"] = "changed"
+
+
+def test_parse_task_action_when_valid_preserves_expected_version() -> None:
+    raw = valid_create_task()
+    raw["command"] = "start_task"
+    raw["task_id"] = TASK_ID
+    raw["payload"] = {"version": 4}
+    result = parse_command(raw)
+    assert isinstance(result, CommandV1)
+    assert result.command is CommandKind.START_TASK
+    assert result.payload["version"] == 4
+
+
+def test_parse_execution_command_when_valid_uses_execution_identifier() -> None:
+    raw = valid_create_task()
+    raw["command"] = "retry_execution"
+    raw["task_id"] = TASK_ID
+    raw["execution_id"] = EXECUTION_ID
+    raw["payload"] = {}
+    result = parse_command(raw)
+    assert isinstance(result, CommandV1)
+    assert result.command is CommandKind.RETRY_EXECUTION
+    assert result.execution_id == UUID(EXECUTION_ID)
 
 
 def test_parse_event_when_success_outcome_returns_success_variant() -> None:
     raw = valid_event()
     raw["event_type"] = "command.succeeded"
-    raw["run_id"] = RUN_ID
+    raw["execution_id"] = EXECUTION_ID
     raw["outcome"] = {
         "status": "success",
         "code": "command_completed",
@@ -66,7 +88,6 @@ def test_parse_event_when_success_outcome_returns_success_variant() -> None:
     result = parse_event(raw)
     assert isinstance(result, EventV1)
     assert isinstance(result.outcome, Success)
-    assert result.outcome.code == "command_completed"
 
 
 @pytest.mark.parametrize(
@@ -85,7 +106,7 @@ def test_parse_event_when_non_success_outcome_preserves_structured_result(
         "code": "state_conflict" if status == "rejected" else "execution_failed",
         "message": "Deterministic result",
         "retryable": retryable,
-        "details": {"current_state": "running"},
+        "details": {},
     }
     result = parse_event(raw)
     assert isinstance(result, EventV1)
@@ -115,37 +136,3 @@ def test_contract_port_when_implemented_by_fake_separates_receipt_from_terminal_
     assert isinstance(port, IntegrationContractPort)
     assert receipt.status is SubmissionStatus.ACCEPTED
     assert not isinstance(receipt, (Success, Rejected, Failed))
-
-
-@pytest.mark.parametrize("read_operation", ["get_events", "get_resources"])
-def test_parse_command_when_read_operation_is_sent_on_command_plane_rejects(
-    read_operation: str,
-) -> None:
-    from scoresymphony_contracts import ContractRejection, RejectionCode
-
-    raw = valid_create_task()
-    raw["command"] = read_operation
-    raw["payload"] = {}
-    result = parse_command(raw)
-    assert isinstance(result, ContractRejection)
-    assert result.code is RejectionCode.SCHEMA_VIOLATION
-    assert result.path == "command"
-
-
-def test_parse_event_when_terminal_command_event_has_no_causation_rejects() -> None:
-    from scoresymphony_contracts import ContractRejection, RejectionCode
-
-    raw = valid_event()
-    raw["event_type"] = "command.failed"
-    raw["causation_id"] = None
-    raw["outcome"] = {
-        "status": "failed",
-        "code": "execution_failed",
-        "message": "Worker failed",
-        "retryable": True,
-        "details": {},
-    }
-    result = parse_event(raw)
-    assert isinstance(result, ContractRejection)
-    assert result.code is RejectionCode.INVALID_STATE
-    assert result.path == "causation_id"

@@ -14,7 +14,15 @@ from .models import ContractRejection, JsonObject, JsonValue, RejectionCode
 PACKAGE_SCHEMA_ROOT: Final = Path(__file__).resolve().parent / "schemas" / "v1"
 REPOSITORY_SCHEMA_ROOT: Final = Path(__file__).resolve().parents[2] / "platform" / "contracts" / "v1"
 IDENTIFIER_FIELDS: Final = frozenset(
-    {"command_id", "event_id", "task_id", "run_id", "correlation_id", "causation_id"}
+    {
+        "command_id",
+        "event_id",
+        "task_id",
+        "execution_id",
+        "project_id",
+        "correlation_id",
+        "causation_id",
+    }
 )
 TIMESTAMP_FIELDS: Final = frozenset({"issued_at", "occurred_at"})
 

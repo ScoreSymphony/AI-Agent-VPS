@@ -23,26 +23,26 @@ ReadonlyJsonObject: TypeAlias = Mapping[str, ReadonlyJsonValue]
 class CommandKind(StrEnum):
     CREATE_TASK = "create_task"
     UPDATE_TASK = "update_task"
-    START_WORKER = "start_worker"
-    CREATE_WORKTREE = "create_worktree"
-    INSPECT_WORKTREE = "inspect_worktree"
-    RUN_TESTS = "run_tests"
-    REQUEST_REVIEW = "request_review"
-    RETRY_RUN = "retry_run"
-    CANCEL_RUN = "cancel_run"
-    MERGE_TASK = "merge_task"
+    START_TASK = "start_task"
+    SUBMIT_TASK = "submit_task"
+    REQUEST_CHANGES_TASK = "request_changes_task"
+    APPROVE_TASK = "approve_task"
+    CANCEL_TASK = "cancel_task"
+    RETRY_EXECUTION = "retry_execution"
+    CANCEL_EXECUTION = "cancel_execution"
 
 
 class EventType(StrEnum):
     TASK_CREATED = "task.created"
     TASK_UPDATED = "task.updated"
-    WORKTREE_CREATED = "worktree.created"
-    WORKTREE_INSPECTED = "worktree.inspected"
-    RUN_STARTED = "run.started"
-    RUN_TESTS_COMPLETED = "run.tests_completed"
-    RUN_CANCELLED = "run.cancelled"
-    RUN_RETRY_SCHEDULED = "run.retry_scheduled"
-    REVIEW_REQUESTED = "review.requested"
+    TASK_STATUS_CHANGED = "task.status_changed"
+    WORKSPACE_CREATED = "workspace.created"
+    EXECUTION_STARTED = "execution.started"
+    EXECUTION_COMPLETED = "execution.completed"
+    EXECUTION_FAILED = "execution.failed"
+    EXECUTION_CANCELLED = "execution.cancelled"
+    EXECUTION_RETRY_SCHEDULED = "execution.retry_scheduled"
+    REVIEW_STARTED = "review.started"
     REVIEW_COMPLETED = "review.completed"
     TASK_MERGED = "task.merged"
     COMMAND_SUCCEEDED = "command.succeeded"
@@ -145,7 +145,7 @@ class CommandV1:
     command: CommandKind
     actor: Actor
     task_id: UUID | None
-    run_id: UUID | None
+    execution_id: UUID | None
     correlation_id: UUID
     issued_at: datetime
     idempotency: Idempotency
@@ -161,7 +161,7 @@ class EventV1:
     occurred_at: datetime
     actor: Actor
     task_id: UUID | None
-    run_id: UUID | None
+    execution_id: UUID | None
     correlation_id: UUID
     causation_id: UUID | None
     data: ReadonlyJsonObject

@@ -4,16 +4,16 @@
   "title": "ScoreSymphony platform event v1",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "event_id", "event_type", "sequence", "occurred_at", "actor", "task_id", "run_id", "correlation_id", "causation_id", "data", "outcome"],
+  "required": ["schema_version", "event_id", "event_type", "sequence", "occurred_at", "actor", "task_id", "execution_id", "correlation_id", "causation_id", "data", "outcome"],
   "properties": {
     "schema_version": {"const": 1},
     "event_id": {"type": "string", "format": "uuid"},
-    "event_type": {"enum": ["task.created", "task.updated", "worktree.created", "worktree.inspected", "run.started", "run.tests_completed", "run.cancelled", "run.retry_scheduled", "review.requested", "review.completed", "task.merged", "command.succeeded", "command.rejected", "command.failed", "events.snapshot", "resources.reported"]},
+    "event_type": {"enum": ["task.created", "task.updated", "task.status_changed", "workspace.created", "execution.started", "execution.completed", "execution.failed", "execution.cancelled", "execution.retry_scheduled", "review.started", "review.completed", "task.merged", "command.succeeded", "command.rejected", "command.failed", "events.snapshot", "resources.reported"]},
     "sequence": {"type": "integer", "minimum": 0},
     "occurred_at": {"type": "string", "format": "date-time"},
     "actor": {"$ref": "#/$defs/actor"},
     "task_id": {"oneOf": [{"type": "string", "format": "uuid"}, {"type": "null"}]},
-    "run_id": {"oneOf": [{"type": "string", "format": "uuid"}, {"type": "null"}]},
+    "execution_id": {"oneOf": [{"type": "string", "format": "uuid"}, {"type": "null"}]},
     "correlation_id": {"type": "string", "format": "uuid"},
     "causation_id": {"oneOf": [{"type": "string", "format": "uuid"}, {"type": "null"}]},
     "data": {"type": "object"},
@@ -23,18 +23,9 @@
     {"if": {"properties": {"event_type": {"const": "command.succeeded"}}}, "then": {"properties": {"causation_id": {"type": "string", "format": "uuid"}, "outcome": {"$ref": "#/$defs/success"}}}},
     {"if": {"properties": {"event_type": {"const": "command.rejected"}}}, "then": {"properties": {"causation_id": {"type": "string", "format": "uuid"}, "outcome": {"$ref": "#/$defs/rejected"}}}},
     {"if": {"properties": {"event_type": {"const": "command.failed"}}}, "then": {"properties": {"causation_id": {"type": "string", "format": "uuid"}, "outcome": {"$ref": "#/$defs/failed"}}}},
-    {
-      "if": {"properties": {"event_type": {"enum": ["task.created", "task.updated", "worktree.created", "worktree.inspected"]}}},
-      "then": {"properties": {"task_id": {"type": "string", "format": "uuid"}, "run_id": {"type": "null"}, "outcome": {"type": "null"}}}
-    },
-    {
-      "if": {"properties": {"event_type": {"enum": ["run.started", "run.tests_completed", "run.cancelled", "run.retry_scheduled", "review.requested", "review.completed", "task.merged"]}}},
-      "then": {"properties": {"task_id": {"type": "string", "format": "uuid"}, "run_id": {"type": "string", "format": "uuid"}, "outcome": {"type": "null"}}}
-    },
-    {
-      "if": {"properties": {"event_type": {"enum": ["events.snapshot", "resources.reported"]}}},
-      "then": {"properties": {"task_id": {"type": "null"}, "run_id": {"type": "null"}, "outcome": {"type": "null"}}}
-    }
+    {"if": {"properties": {"event_type": {"enum": ["task.created", "task.updated", "task.status_changed", "workspace.created", "review.started", "review.completed", "task.merged"]}}}, "then": {"properties": {"task_id": {"type": "string", "format": "uuid"}, "execution_id": {"type": "null"}, "outcome": {"type": "null"}}}},
+    {"if": {"properties": {"event_type": {"enum": ["execution.started", "execution.completed", "execution.failed", "execution.cancelled", "execution.retry_scheduled"]}}}, "then": {"properties": {"task_id": {"type": "string", "format": "uuid"}, "execution_id": {"type": "string", "format": "uuid"}, "outcome": {"type": "null"}}}},
+    {"if": {"properties": {"event_type": {"enum": ["events.snapshot", "resources.reported"]}}}, "then": {"properties": {"task_id": {"type": "null"}, "execution_id": {"type": "null"}, "outcome": {"type": "null"}}}}
   ],
   "$defs": {
     "actor": {
