@@ -123,6 +123,40 @@ def test_parse_command_when_schema_version_is_missing_reports_missing_field() ->
     assert result.path == "schema_version"
 
 
+@pytest.mark.parametrize("malformed", [[], {}])
+def test_parse_command_when_discriminator_is_not_text_returns_structured_rejection(
+    malformed: JsonObject | list[object],
+) -> None:
+    # Given
+    raw = valid_create_task()
+    raw["command"] = malformed
+
+    # When
+    result = parse_command(raw)
+
+    # Then
+    assert isinstance(result, ContractRejection)
+    assert result.code is RejectionCode.SCHEMA_VIOLATION
+    assert result.path == "command"
+
+
+@pytest.mark.parametrize("malformed", [[], {}])
+def test_parse_event_when_discriminator_is_not_text_returns_structured_rejection(
+    malformed: JsonObject | list[object],
+) -> None:
+    # Given
+    raw = valid_event()
+    raw["event_type"] = malformed
+
+    # When
+    result = parse_event(raw)
+
+    # Then
+    assert isinstance(result, ContractRejection)
+    assert result.code is RejectionCode.SCHEMA_VIOLATION
+    assert result.path == "event_type"
+
+
 @pytest.mark.parametrize(
     ("command", "task_id", "run_id"),
     [

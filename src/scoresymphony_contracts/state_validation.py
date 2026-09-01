@@ -49,6 +49,8 @@ def _invalid_state(message: str, path: str) -> ContractRejection:
 
 def command_state_rejection(message: JsonObject) -> ContractRejection | None:
     command = message.get("command")
+    if not isinstance(command, str):
+        return None
     task_id = message.get("task_id")
     run_id = message.get("run_id")
     if command == "create_task" and task_id is not None:
@@ -64,6 +66,8 @@ def command_state_rejection(message: JsonObject) -> ContractRejection | None:
 
 def _event_identifier_rejection(message: JsonObject) -> ContractRejection | None:
     event_type = message.get("event_type")
+    if not isinstance(event_type, str):
+        return None
     task_id = message.get("task_id")
     run_id = message.get("run_id")
     if event_type in TASK_EVENTS:
@@ -103,6 +107,10 @@ def event_state_rejection(message: JsonObject) -> ContractRejection | None:
                     "outcome.status",
                 )
         return None
-    if event_type in TASK_EVENTS | RUN_EVENTS | GLOBAL_EVENTS and outcome is not None:
+    if (
+        isinstance(event_type, str)
+        and event_type in TASK_EVENTS | RUN_EVENTS | GLOBAL_EVENTS
+        and outcome is not None
+    ):
         return _invalid_state(f"{event_type} cannot contain an outcome", "outcome")
     return None
