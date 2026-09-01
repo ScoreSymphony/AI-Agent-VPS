@@ -1,0 +1,18 @@
+schema_version: 1
+orchestrator:
+  engine: hermes
+  sole_authority: true
+  delegation:
+    orchestrator_enabled: false
+    max_spawn_depth: 1
+execution:
+  engine: forge
+  strategic_planning: false
+  lifecycle_controls:
+    - task_state
+    - worktree
+    - run
+    - ci
+    - review
+    - merge
+    - audit

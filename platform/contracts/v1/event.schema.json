@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://scoresymphony.dev/contracts/v1/event.schema.json",
+  "title": "ScoreSymphony platform event v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "event_id",
+    "sequence",
+    "aggregate_type",
+    "aggregate_id",
+    "event_type",
+    "occurred_at",
+    "actor",
+    "data"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "event_id": {"type": "string", "format": "uuid"},
+    "sequence": {"type": "integer", "minimum": 0},
+    "aggregate_type": {"enum": ["task", "run", "worktree", "review", "system"]},
+    "aggregate_id": {"type": "string", "minLength": 1},
+    "event_type": {"type": "string", "minLength": 1},
+    "occurred_at": {"type": "string", "format": "date-time"},
+    "actor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "id"],
+      "properties": {
+        "type": {"enum": ["user", "hermes", "forge", "worker", "system"]},
+        "id": {"type": "string", "minLength": 1}
+      }
+    },
+    "correlation_id": {"type": ["string", "null"]},
+    "causation_id": {"type": ["string", "null"]},
+    "data": {"type": "object"}
+  }
+}

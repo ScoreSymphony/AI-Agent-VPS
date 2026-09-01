@@ -1,0 +1,31 @@
+name: scoresymphony-agent-platform
+
+services:
+  forge-upstream:
+    profiles: ["upstream-smoke"]
+    build:
+      context: ./core/forge
+    ports:
+      - "${SCORESYMPHONY_FORGE_PORT:-8080}:8080"
+    volumes:
+      - forge-data:/data
+    environment:
+      RUST_LOG: info
+
+  hermes-upstream:
+    profiles: ["upstream-smoke"]
+    build:
+      context: ./core/hermes
+      args:
+        HERMES_GIT_SHA: b81383ec215400cbbc7d9768cf4ce45a19f9092a
+    volumes:
+      - hermes-data:/opt/data
+    environment:
+      HERMES_UID: ${HERMES_UID:-10000}
+      HERMES_GID: ${HERMES_GID:-10000}
+    network_mode: host
+    command: ["gateway", "run"]
+
+volumes:
+  forge-data:
+  hermes-data:

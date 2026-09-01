@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "components"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "components": {
+      "type": "object",
+      "additionalProperties": {"$ref": "#/$defs/component"}
+    }
+  },
+  "$defs": {
+    "component": {
+      "type": "object",
+      "required": ["kind", "description", "source", "license", "bundled", "enabled", "pin", "adapter"],
+      "properties": {
+        "kind": {"enum": ["core", "vendored", "managed_external", "remote_external"]},
+        "description": {"type": "string", "minLength": 1},
+        "source": {"type": "string", "minLength": 1},
+        "license": {"type": "string", "minLength": 1},
+        "bundled": {"type": "boolean"},
+        "enabled": {"type": "boolean"},
+        "path": {"type": "string", "minLength": 1},
+        "pin": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+        "adapter": {"type": "string", "minLength": 1},
+        "install_on_demand": {"type": "boolean"},
+        "boundary": {"enum": ["process", "http", "mcp", "remote_api"]}
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"bundled": {"const": true}}, "required": ["bundled"]},
+          "then": {"required": ["path"]}
+        },
+        {
+          "if": {"properties": {"kind": {"enum": ["managed_external", "remote_external"]}}, "required": ["kind"]},
+          "then": {"required": ["boundary"]}
+        }
+      ],
+      "additionalProperties": false
+    }
+  }
+}

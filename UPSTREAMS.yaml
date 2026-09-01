@@ -1,0 +1,27 @@
+schema_version: 1
+upstreams:
+  forge:
+    repository: https://github.com/ForgeAILab/forge.git
+    default_branch: main
+    license: MIT
+    integration: core
+    path: core/forge
+    pinned_commit: d49fac7ca6b3b1ce310c3e950aaac64a080f60a6
+    imported_at: "2026-09-01"
+    update_policy: reviewed_snapshot
+    excluded_paths: []
+  hermes:
+    repository: https://github.com/NousResearch/hermes-agent.git
+    default_branch: main
+    license: MIT
+    integration: core
+    path: core/hermes
+    pinned_commit: b81383ec215400cbbc7d9768cf4ce45a19f9092a
+    imported_at: "2026-09-01"
+    update_policy: reviewed_snapshot
+    excluded_paths:
+      - plugins/security-guidance
+      - tests/agent/test_restore_primary_pool_reselect.py
+      - optional-skills/research/darwinian-evolver
+      - website/docs/user-guide/skills/optional/research/research-darwinian-evolver.md
+      - website/i18n/zh-Hans/docusaurus-plugin-content-docs/current/user-guide/skills/optional/research/research-darwinian-evolver.md

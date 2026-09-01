@@ -1,0 +1,272 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+  packages: write
+  id-token: write
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build:
+    name: Build ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+            artifact: forge-x86_64-linux
+            builder: cargo
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-latest
+            artifact: forge-aarch64-linux
+            builder: cargo
+          - target: x86_64-unknown-linux-musl
+            os: ubuntu-latest
+            artifact: forge-x86_64-linux-musl
+            builder: cross
+          - target: aarch64-unknown-linux-musl
+            os: ubuntu-latest
+            artifact: forge-aarch64-linux-musl
+            builder: cross
+          - target: x86_64-apple-darwin
+            os: macos-latest
+            artifact: forge-x86_64-macos
+            builder: cargo
+          - target: aarch64-apple-darwin
+            os: macos-latest
+            artifact: forge-aarch64-macos
+            builder: cargo
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 10
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+
+      - name: Install web dependencies
+        working-directory: web
+        run: pnpm install --frozen-lockfile
+
+      - name: Build web assets
+        working-directory: web
+        run: pnpm build
+
+      - name: Install cross-compilation tools (Linux ARM64)
+        if: matrix.target == 'aarch64-unknown-linux-gnu'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu
+
+      - name: Install cross
+        if: matrix.builder == 'cross'
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cross
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+
+      - name: Build forge binary
+        env:
+          FORGE_SKIP_WEB_BUILD: "1"
+          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
+          CC_aarch64_unknown_linux_gnu: aarch64-linux-gnu-gcc
+        run: ${{ matrix.builder }} build -p forge-cli --release --target ${{ matrix.target }}
+
+      - name: Build forge-ctl binary
+        env:
+          FORGE_SKIP_WEB_BUILD: "1"
+          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
+          CC_aarch64_unknown_linux_gnu: aarch64-linux-gnu-gcc
+        run: ${{ matrix.builder }} build -p forge-client --release --target ${{ matrix.target }}
+
+      - name: Package binaries
+        run: |
+          mkdir -p dist/web
+          cp target/${{ matrix.target }}/release/forge dist/
+          cp target/${{ matrix.target }}/release/forge-ctl dist/
+          cp -R web/dist dist/web/dist
+          tar -czf ${{ matrix.artifact }}.tar.gz -C dist forge forge-ctl web
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.artifact }}.tar.gz
+
+  release:
+    name: Create Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v8
+        with:
+          path: artifacts
+
+      - name: Generate checksums
+        run: |
+          # download-artifact nests files as artifacts/<name>/<name>.tar.gz; flatten
+          # so SHA256SUMS lists clean filenames that match what users download from
+          # the release page (`sha256sum -c SHA256SUMS` works against downloaded files).
+          mkdir -p release-files
+          find artifacts -name '*.tar.gz' -type f -exec cp {} release-files/ \;
+          cd release-files && sha256sum *.tar.gz > ../SHA256SUMS
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v3
+        with:
+          generate_release_notes: true
+          files: |
+            artifacts/**/*.tar.gz
+            SHA256SUMS
+
+  container:
+    name: Publish GHCR Image
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Login to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+          # `latest` is added automatically for stable semver tags only —
+          # pre-releases like v0.1.1-rc.1 correctly skip it.
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          provenance: true
+          sbom: true
+
+  publish-npm:
+    name: Publish npm Bootstrapper
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+
+      - name: Set package version from tag
+        working-directory: npx-cli
+        run: npm version "${GITHUB_REF_NAME#v}" --no-git-tag-version --allow-same-version
+
+      - name: Publish package
+        working-directory: npx-cli
+        run: |
+          package_name=$(node -p "require('./package.json').name")
+          version="${GITHUB_REF_NAME#v}"
+          if npm view "$package_name@$version" version >/dev/null 2>&1; then
+            echo "$package_name@$version already exists on npm; skipping publish."
+            exit 0
+          fi
+
+          npm_tag=latest
+          if [[ "$version" == *-* ]]; then
+            npm_tag=next
+          fi
+          npm publish --access public --provenance --tag "$npm_tag"
+
+  update-homebrew-tap:
+    name: Update Homebrew Tap
+    needs: release
+    runs-on: ubuntu-latest
+    if: ${{ !contains(github.ref_name, '-') }}
+    steps:
+      - name: Dispatch tap update
+        env:
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          TAG_NAME: ${{ github.ref_name }}
+          SOURCE_REPOSITORY: ${{ github.repository }}
+          SOURCE_RUN_ID: ${{ github.run_id }}
+        run: |
+          set -euo pipefail
+
+          if [[ -z "${HOMEBREW_TAP_TOKEN}" ]]; then
+            echo "::notice::HOMEBREW_TAP_TOKEN is not configured; skipping Homebrew tap update."
+            exit 0
+          fi
+
+          version="${TAG_NAME#v}"
+          payload="$(
+            jq -nc \
+              --arg version "$version" \
+              --arg tag "$TAG_NAME" \
+              --arg source_repository "$SOURCE_REPOSITORY" \
+              --arg source_run_id "$SOURCE_RUN_ID" \
+              '{
+                event_type: "forge-release",
+                client_payload: {
+                  version: $version,
+                  tag: $tag,
+                  source_repository: $source_repository,
+                  source_run_id: $source_run_id
+                }
+              }'
+          )"
+
+          curl -fsSL \
+            -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${HOMEBREW_TAP_TOKEN}" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/ForgeAILab/homebrew-tap/dispatches" \
+            -d "$payload"
