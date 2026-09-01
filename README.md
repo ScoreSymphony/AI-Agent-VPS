@@ -13,10 +13,11 @@ abgeleiteten Orchestrierungs-Kern und die eigene ScoreSymphony-Control-Plane.
 - **Externe Komponenten** werden getrennt registriert und unter ihrer jeweiligen
   Originallizenz installiert. Nicht-MIT-Code wird nicht in den MIT-Kern kopiert.
 
-Der aktuelle Stand ist eine verifizierbare Monorepo-Baseline. Forge und Hermes
-sind als gepinnte, lizenzgepruefte Upstream-Snapshots enthalten. Dokumentierte
-nicht-MIT-Unterpfade von Hermes sind ausgeschlossen. Die funktionale Kopplung
-ist bewusst noch nicht als fertig markiert.
+Der aktuelle Stand ist eine verifizierbare Monorepo-Baseline mit ausfuehrbarer
+V1 Contract Runtime. Forge und Hermes sind als gepinnte, lizenzgepruefte
+Upstream-Snapshots enthalten. Dokumentierte nicht-MIT-Unterpfade von Hermes
+sind ausgeschlossen. Ein laufender Transport und die funktionale Kopplung sind
+bewusst noch nicht als fertig markiert.
 
 ## Struktur
 

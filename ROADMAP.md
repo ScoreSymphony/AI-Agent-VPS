@@ -43,6 +43,9 @@ Abhängigkeiten, Risiken und überprüfbaren Abnahmekriterien.
   dokumentiert.
 - Rollen von Hermes, Forge, Workern und Control Plane dokumentiert.
 - Version-1-Schemas für Commands und Events angelegt.
+- ADR-0001 entscheidet den ersten Transport als lokales HTTP/JSON mit
+  SSE-Rückkanal; die ausführbare V1 Contract Runtime mit zentraler Validierung,
+  typisierten Ergebnissen und Negativtests ist umgesetzt.
 - Component Registry mit Qwen Code als deaktivierter
   `managed_external`-Komponente angelegt.
 - Baseline-Validierung, Pytest und GitHub Actions eingerichtet und auf `main`
@@ -51,7 +54,7 @@ Abhängigkeiten, Risiken und überprüfbaren Abnahmekriterien.
 
 ### Noch nicht umgesetzt
 
-- Laufender Hermes–Forge-Adapter und Transport.
+- Laufender Hermes–Forge-Adapter und HTTP/SSE-Transport.
 - Gemeinsame Task-/Run-Zuordnung und zuverlässige Event-Übermittlung.
 - Shell-Worker-End-to-End-Durchlauf.
 - Recovery, Authentifizierung, Autorisierung und Produktionsbetrieb.

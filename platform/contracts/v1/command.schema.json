@@ -4,38 +4,55 @@
   "title": "ScoreSymphony platform command v1",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "request_id", "command", "actor", "issued_at", "payload"],
+  "required": ["schema_version", "command_id", "command", "actor", "task_id", "run_id", "correlation_id", "issued_at", "idempotency", "payload"],
   "properties": {
     "schema_version": {"const": 1},
-    "request_id": {"type": "string", "format": "uuid"},
-    "command": {
-      "enum": [
-        "create_task",
-        "update_task",
-        "start_worker",
-        "create_worktree",
-        "inspect_worktree",
-        "run_tests",
-        "request_review",
-        "retry_run",
-        "cancel_run",
-        "merge_task",
-        "get_events",
-        "get_resources"
-      ]
+    "command_id": {"type": "string", "format": "uuid"},
+    "command": {"enum": ["create_task", "update_task", "start_worker", "create_worktree", "inspect_worktree", "run_tests", "request_review", "retry_run", "cancel_run", "merge_task", "get_events", "get_resources"]},
+    "actor": {"$ref": "#/$defs/actor"},
+    "task_id": {"oneOf": [{"type": "string", "format": "uuid"}, {"type": "null"}]},
+    "run_id": {"oneOf": [{"type": "string", "format": "uuid"}, {"type": "null"}]},
+    "correlation_id": {"type": "string", "format": "uuid"},
+    "issued_at": {"type": "string", "format": "date-time"},
+    "idempotency": {"$ref": "#/$defs/idempotency"},
+    "payload": {"type": "object"}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"command": {"const": "create_task"}}},
+      "then": {"properties": {"task_id": {"type": "null"}, "run_id": {"type": "null"}, "payload": {"$ref": "#/$defs/create_task_payload"}}}
     },
+    {
+      "if": {"properties": {"command": {"enum": ["update_task", "start_worker", "create_worktree", "inspect_worktree", "run_tests", "request_review", "retry_run", "cancel_run", "merge_task"]}}},
+      "then": {"properties": {"task_id": {"type": "string", "format": "uuid"}}}
+    },
+    {
+      "if": {"properties": {"command": {"enum": ["run_tests", "request_review", "retry_run", "cancel_run", "merge_task"]}}},
+      "then": {"properties": {"run_id": {"type": "string", "format": "uuid"}}}
+    },
+    {
+      "if": {"properties": {"command": {"enum": ["update_task", "start_worker", "create_worktree", "inspect_worktree"]}}},
+      "then": {"properties": {"run_id": {"type": "null"}}}
+    }
+  ],
+  "$defs": {
     "actor": {
       "type": "object",
       "additionalProperties": false,
       "required": ["type", "id"],
-      "properties": {
-        "type": {"enum": ["user", "hermes", "system"]},
-        "id": {"type": "string", "minLength": 1}
-      }
+      "properties": {"type": {"enum": ["user", "hermes", "system"]}, "id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"}}
     },
-    "task_id": {"type": ["string", "null"]},
-    "issued_at": {"type": "string", "format": "date-time"},
-    "idempotency_key": {"type": ["string", "null"]},
-    "payload": {"type": "object"}
+    "idempotency": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["key", "scope", "replay_policy"],
+      "properties": {"key": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"}, "scope": {"const": "command"}, "replay_policy": {"const": "return_previous"}}
+    },
+    "create_task_payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["title", "worker_class", "requires_review"],
+      "properties": {"title": {"type": "string", "minLength": 1, "maxLength": 256}, "worker_class": {"const": "shell"}, "requires_review": {"type": "boolean"}}
+    }
   }
 }

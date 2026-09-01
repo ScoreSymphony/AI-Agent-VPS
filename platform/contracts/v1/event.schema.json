@@ -4,36 +4,64 @@
   "title": "ScoreSymphony platform event v1",
   "type": "object",
   "additionalProperties": false,
-  "required": [
-    "schema_version",
-    "event_id",
-    "sequence",
-    "aggregate_type",
-    "aggregate_id",
-    "event_type",
-    "occurred_at",
-    "actor",
-    "data"
-  ],
+  "required": ["schema_version", "event_id", "event_type", "sequence", "occurred_at", "actor", "task_id", "run_id", "correlation_id", "causation_id", "data", "outcome"],
   "properties": {
     "schema_version": {"const": 1},
     "event_id": {"type": "string", "format": "uuid"},
+    "event_type": {"enum": ["task.created", "task.updated", "worktree.created", "worktree.inspected", "run.started", "run.tests_completed", "run.cancelled", "run.retry_scheduled", "review.requested", "review.completed", "task.merged", "command.succeeded", "command.rejected", "command.failed", "events.snapshot", "resources.reported"]},
     "sequence": {"type": "integer", "minimum": 0},
-    "aggregate_type": {"enum": ["task", "run", "worktree", "review", "system"]},
-    "aggregate_id": {"type": "string", "minLength": 1},
-    "event_type": {"type": "string", "minLength": 1},
     "occurred_at": {"type": "string", "format": "date-time"},
+    "actor": {"$ref": "#/$defs/actor"},
+    "task_id": {"oneOf": [{"type": "string", "format": "uuid"}, {"type": "null"}]},
+    "run_id": {"oneOf": [{"type": "string", "format": "uuid"}, {"type": "null"}]},
+    "correlation_id": {"type": "string", "format": "uuid"},
+    "causation_id": {"oneOf": [{"type": "string", "format": "uuid"}, {"type": "null"}]},
+    "data": {"type": "object"},
+    "outcome": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/success"}, {"$ref": "#/$defs/rejected"}, {"$ref": "#/$defs/failed"}]}
+  },
+  "allOf": [
+    {"if": {"properties": {"event_type": {"const": "command.succeeded"}}}, "then": {"properties": {"outcome": {"$ref": "#/$defs/success"}}}},
+    {"if": {"properties": {"event_type": {"const": "command.rejected"}}}, "then": {"properties": {"outcome": {"$ref": "#/$defs/rejected"}}}},
+    {"if": {"properties": {"event_type": {"const": "command.failed"}}}, "then": {"properties": {"outcome": {"$ref": "#/$defs/failed"}}}},
+    {
+      "if": {"properties": {"event_type": {"enum": ["task.created", "task.updated", "worktree.created", "worktree.inspected"]}}},
+      "then": {"properties": {"task_id": {"type": "string", "format": "uuid"}, "run_id": {"type": "null"}, "outcome": {"type": "null"}}}
+    },
+    {
+      "if": {"properties": {"event_type": {"enum": ["run.started", "run.tests_completed", "run.cancelled", "run.retry_scheduled", "review.requested", "review.completed", "task.merged"]}}},
+      "then": {"properties": {"task_id": {"type": "string", "format": "uuid"}, "run_id": {"type": "string", "format": "uuid"}, "outcome": {"type": "null"}}}
+    },
+    {
+      "if": {"properties": {"event_type": {"enum": ["events.snapshot", "resources.reported"]}}},
+      "then": {"properties": {"task_id": {"type": "null"}, "run_id": {"type": "null"}, "outcome": {"type": "null"}}}
+    }
+  ],
+  "$defs": {
     "actor": {
       "type": "object",
       "additionalProperties": false,
       "required": ["type", "id"],
-      "properties": {
-        "type": {"enum": ["user", "hermes", "forge", "worker", "system"]},
-        "id": {"type": "string", "minLength": 1}
-      }
+      "properties": {"type": {"enum": ["user", "hermes", "forge", "worker", "system"]}, "id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"}}
     },
-    "correlation_id": {"type": ["string", "null"]},
-    "causation_id": {"type": ["string", "null"]},
-    "data": {"type": "object"}
+    "success": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "code", "message", "details"],
+      "properties": {"status": {"const": "success"}, "code": {"$ref": "#/$defs/result_code"}, "message": {"$ref": "#/$defs/result_message"}, "retryable": {"const": false}, "details": {"type": "object"}}
+    },
+    "rejected": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "code", "message", "retryable", "details"],
+      "properties": {"status": {"const": "rejected"}, "code": {"$ref": "#/$defs/result_code"}, "message": {"$ref": "#/$defs/result_message"}, "retryable": {"const": false}, "details": {"type": "object"}}
+    },
+    "failed": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "code", "message", "retryable", "details"],
+      "properties": {"status": {"const": "failed"}, "code": {"$ref": "#/$defs/result_code"}, "message": {"$ref": "#/$defs/result_message"}, "retryable": {"type": "boolean"}, "details": {"type": "object"}}
+    },
+    "result_code": {"type": "string", "pattern": "^[a-z][a-z0-9_]{0,63}$"},
+    "result_message": {"type": "string", "minLength": 1, "maxLength": 512}
   }
 }

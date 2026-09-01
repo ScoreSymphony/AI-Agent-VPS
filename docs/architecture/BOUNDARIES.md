@@ -5,11 +5,21 @@
 Hermes emits versioned commands and consumes versioned events. It does not
 write Forge state directly and does not import Forge crates.
 
+The stable adapter seam is `scoresymphony_contracts.IntegrationContractPort`.
+Its values are parsed by the central V1 validators before an adapter sees
+them. The initial transport decision is recorded in
+`ADR-0001-HERMES-FORGE-TRANSPORT.md`.
+
 ## Platform to Forge
 
 The platform adapter translates commands into Forge-supported operations and
 normalizes Forge results into platform events. Adapter failures are explicit;
 they are never reinterpreted as successful task completion.
+
+The platform stores no competing lifecycle state. Idempotency keys,
+correlation identifiers, and transport cursors identify requests and delivery;
+they do not transfer ownership of tasks, runs, worktrees, reviews, or merge
+gates away from Forge.
 
 ## Platform to workers
 
