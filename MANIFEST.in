@@ -1,0 +1,2 @@
+include platform/contracts/v1/command.schema.json
+include platform/contracts/v1/event.schema.json
