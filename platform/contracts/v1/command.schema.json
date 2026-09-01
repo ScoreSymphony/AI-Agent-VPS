@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://scoresymphony.dev/contracts/v1/command.schema.json",
+  "title": "ScoreSymphony platform command v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "request_id", "command", "actor", "issued_at", "payload"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "request_id": {"type": "string", "format": "uuid"},
+    "command": {
+      "enum": [
+        "create_task",
+        "update_task",
+        "start_worker",
+        "create_worktree",
+        "inspect_worktree",
+        "run_tests",
+        "request_review",
+        "retry_run",
+        "cancel_run",
+        "merge_task",
+        "get_events",
+        "get_resources"
+      ]
+    },
+    "actor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "id"],
+      "properties": {
+        "type": {"enum": ["user", "hermes", "system"]},
+        "id": {"type": "string", "minLength": 1}
+      }
+    },
+    "task_id": {"type": ["string", "null"]},
+    "issued_at": {"type": "string", "format": "date-time"},
+    "idempotency_key": {"type": ["string", "null"]},
+    "payload": {"type": "object"}
+  }
+}

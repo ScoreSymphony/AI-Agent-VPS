@@ -1,0 +1,33 @@
+schema_version: 1
+components:
+  forge:
+    kind: core
+    description: Deterministic execution and lifecycle engine.
+    source: https://github.com/ForgeAILab/forge.git
+    license: MIT
+    bundled: true
+    enabled: true
+    path: core/forge
+    pin: d49fac7ca6b3b1ce310c3e950aaac64a080f60a6
+    adapter: platform-forge-v1
+  hermes:
+    kind: core
+    description: Sole intelligent orchestration engine.
+    source: https://github.com/NousResearch/hermes-agent.git
+    license: MIT
+    bundled: true
+    enabled: true
+    path: core/hermes
+    pin: b81383ec215400cbbc7d9768cf4ce45a19f9092a
+    adapter: platform-hermes-v1
+  qwen-code:
+    kind: managed_external
+    description: Optional external coding agent; not bundled or installed yet.
+    source: https://github.com/QwenLM/qwen-code.git
+    license: Apache-2.0
+    bundled: false
+    enabled: false
+    install_on_demand: true
+    pin: 24b53add508913ad149392b87def2bd7594b1f08
+    adapter: qwen-code-process-v1
+    boundary: process

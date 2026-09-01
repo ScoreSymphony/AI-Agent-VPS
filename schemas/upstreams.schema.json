@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "upstreams"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "upstreams": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "repository",
+          "default_branch",
+          "license",
+          "integration",
+          "path",
+          "pinned_commit",
+          "imported_at",
+          "update_policy",
+          "excluded_paths"
+        ],
+        "properties": {
+          "repository": {"type": "string", "minLength": 1},
+          "default_branch": {"type": "string", "minLength": 1},
+          "license": {"const": "MIT"},
+          "integration": {"enum": ["core", "vendored"]},
+          "path": {"type": "string", "minLength": 1},
+          "pinned_commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+          "imported_at": {"type": "string", "format": "date"},
+          "update_policy": {"const": "reviewed_snapshot"},
+          "excluded_paths": {
+            "type": "array",
+            "items": {"type": "string", "minLength": 1},
+            "uniqueItems": true
+          }
+        }
+      }
+    }
+  }
+}
