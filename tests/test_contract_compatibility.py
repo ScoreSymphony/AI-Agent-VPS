@@ -1,6 +1,10 @@
 from __future__ import annotations
 
 import json
+import subprocess
+import sys
+import tarfile
+import zipfile
 from copy import deepcopy
 from pathlib import Path
 
@@ -109,3 +113,58 @@ def test_event_schema_when_state_is_invalid_rejects_wire_message(
 
     # Then
     assert errors
+
+
+def test_source_distribution_builds_wheel_with_canonical_contract_schemas(
+    tmp_path: Path,
+) -> None:
+    # Given
+    egg_base = tmp_path / "egg-info"
+    dist_dir = tmp_path / "dist"
+    unpack_dir = tmp_path / "unpack"
+    wheel_dir = tmp_path / "wheel"
+    for directory in (egg_base, dist_dir, unpack_dir, wheel_dir):
+        directory.mkdir()
+
+    # When
+    subprocess.run(
+        [
+            sys.executable,
+            "setup.py",
+            "--quiet",
+            "egg_info",
+            "--egg-base",
+            str(egg_base),
+            "sdist",
+            "--dist-dir",
+            str(dist_dir),
+        ],
+        cwd=ROOT,
+        check=True,
+    )
+    archive = next(dist_dir.glob("*.tar.gz"))
+    with tarfile.open(archive) as source_distribution:
+        source_distribution.extractall(unpack_dir, filter="data")
+    source_root = next(unpack_dir.iterdir())
+    subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "pip",
+            "wheel",
+            str(source_root),
+            "--no-deps",
+            "--no-build-isolation",
+            "--wheel-dir",
+            str(wheel_dir),
+        ],
+        check=True,
+    )
+
+    # Then
+    wheel = next(wheel_dir.glob("*.whl"))
+    with zipfile.ZipFile(wheel) as built_wheel:
+        for name in ("command.schema.json", "event.schema.json"):
+            packaged = built_wheel.read(f"scoresymphony_contracts/schemas/v1/{name}")
+            canonical = (ROOT / "platform" / "contracts" / "v1" / name).read_bytes()
+            assert packaged == canonical
