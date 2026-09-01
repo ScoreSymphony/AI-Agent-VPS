@@ -50,6 +50,29 @@ def _missing_required_field(
     )
 
 
+def _timezone_rejection(message: JsonObject) -> ContractRejection | None:
+    """Reject ISO timestamps that parse but do not identify an absolute instant."""
+    for field in ("issued_at", "occurred_at"):
+        raw = message.get(field)
+        if not isinstance(raw, str):
+            continue
+        try:
+            value = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+        except ValueError:
+            return ContractRejection(
+                RejectionCode.INVALID_TIMESTAMP,
+                f"invalid timestamp: {field}",
+                field,
+            )
+        if value.tzinfo is None or value.utcoffset() is None:
+            return ContractRejection(
+                RejectionCode.INVALID_TIMESTAMP,
+                f"timestamp must include timezone: {field}",
+                field,
+            )
+    return None
+
+
 def _validate(
     raw: JsonValue,
     validator: Draft202012Validator,
@@ -76,6 +99,9 @@ def _validate(
             )
             if errors:
                 return schema_rejection(errors[0])
+            timezone_rejection = _timezone_rejection(message)
+            if timezone_rejection is not None:
+                return timezone_rejection
             return message
         case _:
             return ContractRejection(
@@ -123,7 +149,7 @@ def _optional_uuid(data: JsonObject, field: str) -> UUID | None:
 
 def _timestamp(data: JsonObject, field: str) -> datetime:
     value = datetime.fromisoformat(_text(data, field).replace("Z", "+00:00"))
-    if value.tzinfo is None:
+    if value.tzinfo is None or value.utcoffset() is None:
         raise TypeError(f"validated field {field} has no timezone")
     return value
 
