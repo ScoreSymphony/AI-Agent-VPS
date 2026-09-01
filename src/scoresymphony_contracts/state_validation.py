@@ -87,7 +87,12 @@ def _event_identifier_rejection(message: JsonObject) -> ContractRejection | None
         return None
     task_id = message.get("task_id")
     run_id = message.get("run_id")
-    if not _identifier_is_well_formed(task_id) or not _identifier_is_well_formed(run_id):
+    causation_id = message.get("causation_id")
+    if (
+        not _identifier_is_well_formed(task_id)
+        or not _identifier_is_well_formed(run_id)
+        or not _identifier_is_well_formed(causation_id)
+    ):
         return None
     if event_type in TASK_EVENTS:
         if task_id is None:
@@ -104,6 +109,8 @@ def _event_identifier_rejection(message: JsonObject) -> ContractRejection | None
             return _invalid_state(f"{event_type} cannot target a task", "task_id")
         if run_id is not None:
             return _invalid_state(f"{event_type} cannot target a run", "run_id")
+    if event_type in TERMINAL_OUTCOMES and causation_id is None:
+        return _invalid_state(f"{event_type} requires causation_id", "causation_id")
     return None
 
 

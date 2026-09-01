@@ -1,6 +1,6 @@
 # Current state
 
-Updated: 2026-09-01
+Updated: 2026-09-02
 
 ## Current objective
 
@@ -19,12 +19,17 @@ boundary for later Hermes-Forge adapters.
 - Component classes and the first managed-external registry entry are defined.
 - Version 1 command and event schemas are present.
 - V1 commands and events have frozen, typed executable Python envelopes.
+- Parsed nested JSON data is recursively read-only after validation.
 - Central validation returns deterministic structured rejections for unknown
   versions, missing fields, malformed identifiers, invalid timestamps, and
   invalid command/event states.
-- Command results distinguish success, deterministic rejection, and execution
-  failure.
-- A transport-independent adapter protocol is present.
+- Command submission is separated from terminal execution: submission returns
+  an ingress `CommandReceipt`, while terminal truth is represented by durable
+  command outcome events.
+- Read/query concerns are not encoded as V1 command kinds.
+- Terminal command events require `causation_id` to identify their command.
+- Separate command-submission and event-read ports are present, with a
+  composite integration protocol for adapters.
 - ADR-0001 selects loopback HTTP/JSON with an SSE return path for the first
   adapter slice based on the pinned Forge and Hermes code.
 - Baseline validation, tests, and a CI workflow are present.
@@ -34,6 +39,7 @@ boundary for later Hermes-Forge adapters.
 
 - Running HTTP/SSE transport and both Hermes/Forge adapters.
 - Shared task/run/event persistence across both engines.
+- Resource/status query contracts beyond cursor-based event reads.
 - The minimal shell-worker vertical slice.
 - Integrated authentication and authorization.
 - Production deployment and reverse proxy configuration.
@@ -51,12 +57,15 @@ Implement the smallest Forge adapter and loopback HTTP/SSE boundary against
 ## Acceptance criteria for the next work package
 
 - The HTTP listener binds to loopback and accepts only validated V1 commands.
+- Submission receipts only report ingress state and never impersonate terminal
+  command completion.
 - V1 commands map to stable Forge operations without importing Forge internals
   into Hermes.
 - Forge remains authoritative for task, run, worktree, review, and merge state.
 - Durable Forge events project to V1 events with cursor-based resynchronization.
-- Adapter success, rejection, failure, duplicate delivery, and malformed input
-  are covered by automated tests.
+- Terminal command events preserve command causation.
+- Adapter acceptance, duplicate detection, rejection, failure, malformed input,
+  and reconnect/replay behavior are covered by automated tests.
 - The complete sequence is covered by an automated end-to-end test.
 
 ## Blockers

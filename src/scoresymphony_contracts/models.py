@@ -14,7 +14,10 @@ SCHEMA_VERSION_V1: Final = 1
 JsonScalar: TypeAlias = str | int | float | bool | None
 JsonValue: TypeAlias = JsonScalar | list["JsonValue"] | dict[str, "JsonValue"]
 JsonObject: TypeAlias = dict[str, JsonValue]
-ReadonlyJsonObject: TypeAlias = Mapping[str, JsonValue]
+ReadonlyJsonValue: TypeAlias = (
+    JsonScalar | tuple["ReadonlyJsonValue", ...] | Mapping[str, "ReadonlyJsonValue"]
+)
+ReadonlyJsonObject: TypeAlias = Mapping[str, ReadonlyJsonValue]
 
 
 class CommandKind(StrEnum):
@@ -28,8 +31,6 @@ class CommandKind(StrEnum):
     RETRY_RUN = "retry_run"
     CANCEL_RUN = "cancel_run"
     MERGE_TASK = "merge_task"
-    GET_EVENTS = "get_events"
-    GET_RESOURCES = "get_resources"
 
 
 class EventType(StrEnum):
@@ -59,6 +60,12 @@ class ActorType(StrEnum):
     SYSTEM = "system"
 
 
+class SubmissionStatus(StrEnum):
+    ACCEPTED = "accepted"
+    DUPLICATE = "duplicate"
+    REJECTED = "rejected"
+
+
 class RejectionCode(StrEnum):
     UNSUPPORTED_SCHEMA_VERSION = "unsupported_schema_version"
     MISSING_REQUIRED_FIELD = "missing_required_field"
@@ -79,6 +86,17 @@ class Idempotency:
     key: str
     scope: str
     replay_policy: str
+
+
+@dataclass(frozen=True, slots=True)
+class CommandReceipt:
+    """Immediate ingress result; terminal execution results arrive as events."""
+
+    command_id: UUID
+    status: SubmissionStatus
+    code: str
+    message: str
+    details: ReadonlyJsonObject
 
 
 @dataclass(frozen=True, slots=True)
@@ -151,5 +169,22 @@ class EventV1:
     schema_version: int = SCHEMA_VERSION_V1
 
 
+def readonly_json_value(value: JsonValue) -> ReadonlyJsonValue:
+    match value:
+        case dict() as mapping:
+            return MappingProxyType(
+                {key: readonly_json_value(item) for key, item in mapping.items()}
+            )
+        case list() as items:
+            return tuple(readonly_json_value(item) for item in items)
+        case str() | int() | float() | bool() | None:
+            return value
+        case unreachable:
+            raise TypeError(f"unsupported JSON value: {unreachable!r}")
+
+
 def readonly_json(data: JsonObject) -> ReadonlyJsonObject:
-    return MappingProxyType(dict(data))
+    frozen = readonly_json_value(data)
+    if not isinstance(frozen, Mapping):
+        raise TypeError("JSON object must freeze to a mapping")
+    return frozen

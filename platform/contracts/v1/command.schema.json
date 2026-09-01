@@ -8,7 +8,7 @@
   "properties": {
     "schema_version": {"const": 1},
     "command_id": {"type": "string", "format": "uuid"},
-    "command": {"enum": ["create_task", "update_task", "start_worker", "create_worktree", "inspect_worktree", "run_tests", "request_review", "retry_run", "cancel_run", "merge_task", "get_events", "get_resources"]},
+    "command": {"enum": ["create_task", "update_task", "start_worker", "create_worktree", "inspect_worktree", "run_tests", "request_review", "retry_run", "cancel_run", "merge_task"]},
     "actor": {"$ref": "#/$defs/actor"},
     "task_id": {"oneOf": [{"type": "string", "format": "uuid"}, {"type": "null"}]},
     "run_id": {"oneOf": [{"type": "string", "format": "uuid"}, {"type": "null"}]},

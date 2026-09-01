@@ -39,15 +39,29 @@ listener. The return path will be an SSE event stream backed by Forge-owned
 durable events and a monotonic cursor. Both directions carry only validated
 ScoreSymphony V1 messages.
 
+The command plane and read/event plane are intentionally distinct:
+
+- V1 commands represent state-changing or execution-request operations.
+- Event and resource/status reads are query concerns, not command kinds.
+- Command submission returns an immediate receipt for acceptance, duplicate
+  detection, or pre-dispatch rejection.
+- Terminal execution truth is emitted only through durable V1 events such as
+  `command.succeeded`, `command.rejected`, and `command.failed`.
+- Terminal command events identify their originating command via
+  `causation_id`.
+
 The executable contract runtime remains transport-independent:
 
 - JSON Schema and semantic validation happen before dispatch or consumption.
-- `IntegrationContractPort` defines typed command submission and event reads.
+- `CommandSubmissionPort` defines typed command submission.
+- `EventReadPort` defines cursor-based event reads.
+- `IntegrationContractPort` composes both without merging their semantics.
 - HTTP status codes and SSE framing do not alter command or event semantics.
 - Forge adapters translate validated commands to stable Forge operations and
   translate Forge-owned outcomes to V1 events.
 - Hermes adapters emit commands and consume events without importing Forge
   crates, database models, routes, or event-bus types.
+- Parsed V1 payload/data structures are recursively read-only after validation.
 
 The concrete HTTP server, authentication, durable cursor implementation, and
 both upstream adapters are intentionally outside this work package.
@@ -89,6 +103,9 @@ overflow.
 - The transport choice is compatible with both pinned upstreams and follows
   the documented preferred architecture.
 - The V1 runtime can be tested without starting either upstream.
+- A successful HTTP submission no longer implies successful command execution.
+- Consumers use the durable event stream for terminal outcomes and cursor-based
+  recovery.
 - No second task, run, worktree, review, merge, or orchestration state is
   introduced by the integration layer.
 - Production exposure, adapter mappings, durable delivery, and recovery remain
