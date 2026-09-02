@@ -51,6 +51,11 @@ def validate() -> None:
         "${SCORESYMPHONY_BIND_HOST:-127.0.0.1}:${SCORESYMPHONY_FORGE_PORT:-8080}:8080" in ports,
         "Forge must bind to loopback by default and expose configurable port 8080",
     )
+    forge_environment = forge.get("environment", {})
+    require(
+        forge_environment.get("FORGE_SERVER_BIND") == "0.0.0.0:8080",
+        "Forge must listen on container port 8080 for the published smoke endpoint",
+    )
     require("forge-data:/data" in forge.get("volumes", []), "Forge data must use a persistent volume")
 
     healthcheck = forge.get("healthcheck")
