@@ -17,6 +17,7 @@ services:
     volumes:
       - forge-data:/data
     environment:
+      FORGE_SERVER_BIND: "0.0.0.0:8080"
       RUST_LOG: "${SCORESYMPHONY_FORGE_LOG_LEVEL:-info}"
     labels:
       io.scoresymphony.component: forge
