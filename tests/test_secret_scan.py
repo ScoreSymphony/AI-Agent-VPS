@@ -30,3 +30,9 @@ def test_placeholder_text_is_not_flagged() -> None:
 def test_local_env_variants_are_sensitive() -> None:
     assert scan_secrets.sensitive_path_reason(scan_secrets.ROOT / ".env.local") == "tracked environment file"
     assert scan_secrets.sensitive_path_reason(scan_secrets.ROOT / ".env.example") is None
+
+
+def test_vendored_upstream_snapshots_are_excluded() -> None:
+    assert scan_secrets.is_excluded(scan_secrets.ROOT / "core/hermes/tests/test_redact.py")
+    assert scan_secrets.is_excluded(scan_secrets.ROOT / "core/forge/crates/api/tests/security_adversarial.rs")
+    assert not scan_secrets.is_excluded(scan_secrets.ROOT / "src/platform/example.py")
