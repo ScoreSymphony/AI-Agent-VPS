@@ -57,7 +57,14 @@ Authorization evaluates an immutable request containing:
 - action;
 - resource type and resource id;
 - authorization scope, normally a project when available;
+- a canonical `operation_digest` covering the exact command/operation payload;
 - bounded context required by policy.
+
+The adapter/runtime that creates the authorization request must derive
+`operation_digest` deterministically from the canonical protected operation. It
+must change whenever security-relevant command or payload content changes. The
+digest is part of the immutable authorization input even when a policy rule does
+not inspect it directly.
 
 Rules return exactly one of:
 
@@ -80,20 +87,24 @@ A security approval grants permission to issue one exact protected operation.
 It is not the same concept as Forge task/review approval and must not mutate Forge
 review state directly.
 
-An approval is bound to the exact authorization request and to one of the policy
-ids that caused `require_approval`. It has an expiry. Self-approval is denied by
-default but may be explicitly enabled for a deliberate single-admin deployment.
+An approval is bound to the exact authorization request, including the canonical
+`operation_digest`, and to one of the policy ids that caused `require_approval`.
+It has an expiry. Self-approval is denied by default but may be explicitly enabled
+for a deliberate single-admin deployment.
 
 Production dispatch must atomically transition an approved record to `consumed`
 before the protected operation is sent downstream, preventing approval replay.
+The runtime must re-evaluate authorization immediately before that transition so
+that a stale approval cannot bypass a newer deny policy.
 
 ### 5. Keep security decisions auditable
 
 Runtime integration must emit audit records for authentication failures,
 authorization decisions, approval creation/decision/consumption, role-binding
 changes, and policy changes. Audit records may contain principal id, action,
-resource, decision, policy ids, command/correlation ids, and timestamps, but must
-not contain credential secret values.
+resource, decision, policy ids, command/correlation ids, operation digest, and
+timestamps, but must not contain credential secret values or raw sensitive
+payloads.
 
 ## Initial action vocabulary
 
@@ -176,9 +187,12 @@ workspace, tool, or merge authority.
 ## Follow-up work
 
 1. Bind authenticated principals to V1 `actor` assertions at HTTP ingress.
-2. Implement persistent role/policy configuration and approval storage.
-3. Add atomic approval consumption before adapter dispatch.
-4. Emit security audit events with secret-safe payloads.
-5. Add API middleware and Control Plane endpoints using the shared ports.
-6. Add integration tests proving unauthorized or unapproved operations never
-   reach the Forge adapter.
+2. Define and implement the canonical operation serialization/digest at the
+   adapter boundary and verify it again before dispatch.
+3. Implement persistent role/policy configuration and approval storage.
+4. Add atomic approval consumption before adapter dispatch.
+5. Re-evaluate authorization immediately before consuming an approval/dispatch.
+6. Emit security audit events with secret-safe payloads.
+7. Add API middleware and Control Plane endpoints using the shared ports.
+8. Add integration tests proving unauthorized, stale-policy, payload-mismatched,
+   or unapproved operations never reach the Forge adapter.
