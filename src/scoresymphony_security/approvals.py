@@ -26,6 +26,9 @@ def approval_satisfies(
     """
 
     current = now or datetime.now(timezone.utc)
+    if current.tzinfo is None or current.utcoffset() is None:
+        raise ValueError("now must be timezone-aware")
+
     request = record.request
 
     if record.status is not ApprovalStatus.APPROVED:
