@@ -4,8 +4,9 @@ Updated: 2026-09-02
 
 ## Current objective
 
-Finish the verified V1 boundary and provide the minimum Forge public recovery
-surface required before the first production-quality Hermes-Forge adapter.
+Finish and verify the Forge public recovery boundary, then build the first
+production-quality ScoreSymphony V1-to-Forge adapter against public Forge
+surfaces only.
 
 ## Implemented in this branch
 
@@ -18,7 +19,7 @@ surface required before the first production-quality Hermes-Forge adapter.
 - Parsed nested contract data is recursively read-only after validation.
 - Terminal command events require command causation.
 - ADR-0001 accurately describes HTTP/JSON + SSE as the live transport without
-  claiming the current SSE feed already provides durable historical replay.
+  treating the in-memory SSE feed as durable history.
 - ADR-0002 is accepted and aligns V1 to verified Forge lifecycle operations.
 - `create_task` carries explicit Forge `project_id` scope.
 - Task mutations carry the expected Forge task `version`.
@@ -28,6 +29,18 @@ surface required before the first production-quality Hermes-Forge adapter.
   or merge authority are removed from V1.
 - Contract fixtures, compatibility checks, semantic rejection tests, and runtime
   tests cover the corrected vocabulary.
+- Forge now exposes authenticated historical domain-event reads through
+  `/api/v1/events` when `after_sequence` or `limit` is supplied, backed by
+  `DomainEventRepo::list_events_after`.
+- Historical event query/response DTOs are public `api-types` contracts with
+  generated TypeScript bindings instead of route-private types.
+- Historical read tests cover authentication, beginning/middle/end cursors,
+  empty results, strict ordering, limits, invalid input, and concurrent
+  append/read behavior.
+- Calling `/api/v1/events` without historical query parameters retains the live
+  broadcast SSE behavior, including `events.resync_required` on lag.
+- The deterministic shell reference worker core exists independently; it is not
+  yet wired into the Forge lifecycle end to end.
 - Baseline validation, Pytest, packaging checks, and GitHub Actions definitions
   remain present.
 
@@ -41,38 +54,41 @@ surface required before the first production-quality Hermes-Forge adapter.
   lifecycle information that can be normalized into V1.
 - Forge `/api/v1/events` is a broadcast SSE stream and signals
   `events.resync_required` on lag.
-- Forge internally persists ordered domain events and consumer cursors, but no
-  equivalent public historical cursor-read endpoint exists yet.
+- Forge persists ordered domain events and exposes authenticated cursor-based
+  historical reads without requiring a client to access Forge database
+  internals.
 
 ## Not implemented yet
 
-- Authenticated public Forge historical domain-event read/recovery endpoint.
-- Running ScoreSymphony command HTTP endpoint and SSE projection adapter.
+- Running ScoreSymphony command HTTP endpoint and V1 SSE projection adapter.
+- Forge V1 command/event adapter against public Forge surfaces.
 - Durable command idempotency integration against Forge-owned state/events.
 - Hermes-side V1 tools/adapter.
-- Minimal shell-worker end-to-end vertical slice.
+- Shell-worker integration into the complete Hermes-to-Forge lifecycle.
 - Production authentication/authorization design beyond existing Forge auth.
 - Deployment, Control Plane, agent registry, managed externals, specialist
   agents, and KVM placement.
 
 ## Next work package
 
-Add the smallest authenticated Forge public API surface that can read ordered
-persisted domain events after a sequence cursor. Follow the nested Forge rules:
+Build the Forge adapter against the corrected V1 contract and public Forge
+surfaces only:
 
-1. define stable API response/query types;
-2. implement a read-only authenticated route backed by `DomainEventRepo`;
-3. cover ordering, cursor, limit, authentication, and empty-result behavior;
-4. document the endpoint in Forge API docs and changelog;
-5. update generated TypeScript types if the public DTO is exported;
-6. keep existing live `/api/v1/events` SSE behavior unchanged.
-
-After that endpoint is proven, implement the ScoreSymphony adapter against the
-corrected V1 contract and the public Forge surfaces only.
+1. map each supported V1 command to the corresponding public Forge operation;
+2. carry project/task/execution identifiers, task versions, correlation and
+   causation metadata correctly;
+3. normalize Forge lifecycle/domain events into stable V1 events;
+4. project optimistic-concurrency and other Forge failures into deterministic
+   V1 rejections/failures;
+5. add durable command-idempotency behavior without creating a second lifecycle
+   authority;
+6. test the adapter independently before wiring the HTTP/SSE runtime and Hermes.
 
 ## Blockers
 
-The V1-to-Forge command mapping is no longer a blocker. Production-grade event
-recovery remains blocked until the selected authenticated historical read
-surface is implemented and tested. The PR must not be merged without a full
-repository CI pass.
+The historical recovery surface is implemented at the code/contract level and
+is no longer the architectural blocker for starting the Forge adapter. The
+current top-level GitHub quality workflow validates the Python platform baseline
+but does not compile or execute the nested Forge Rust test suite, so the recovery
+change must not be treated as release-verified or merged from this follow-up
+branch until the relevant Forge Rust tests/build checks have passed.
