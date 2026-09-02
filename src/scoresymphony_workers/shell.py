@@ -243,6 +243,27 @@ class ShellWorker:
                 subprocess, "CREATE_NEW_PROCESS_GROUP", 0
             )
 
+        if cancel_event is not None and cancel_event.is_set():
+            return ShellExecutionResult(
+                status=ShellExecutionStatus.CANCELLED,
+                argv=tuple(command.argv),
+                cwd=command.cwd,
+                exit_code=None,
+                stdout="",
+                stderr="",
+                error_code="cancelled",
+            )
+
+        before = self._snapshot_workspace()
+
+        popen_kwargs: dict[str, object] = {}
+        if os.name == "posix":
+            popen_kwargs["start_new_session"] = True
+        elif os.name == "nt":
+            popen_kwargs["creationflags"] = getattr(
+                subprocess, "CREATE_NEW_PROCESS_GROUP", 0
+            )
+
         try:
             process = subprocess.Popen(
                 argv,
