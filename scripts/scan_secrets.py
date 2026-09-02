@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Fail CI when tracked repository content contains high-confidence secrets.
+"""Fail CI when first-party tracked content contains high-confidence secrets.
 
-This scanner intentionally focuses on strong signatures and tracked secret files.
-It complements, but does not replace, GitHub Secret Scanning / push protection.
+Vendored upstream snapshots are excluded because their test suites and documentation
+intentionally contain credential-shaped redaction fixtures. Whole-repository secret
+protection is provided by GitHub Secret Scanning / push protection when enabled.
 """
 
 from __future__ import annotations
@@ -17,6 +18,10 @@ MAX_FILE_SIZE = 2 * 1024 * 1024
 
 ALLOWED_ENV_FILES = {".env.example"}
 SENSITIVE_SUFFIXES = {".key", ".p12", ".pfx"}
+EXCLUDED_PREFIXES = (
+    Path("core/forge"),
+    Path("core/hermes"),
+)
 
 PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
     (
@@ -40,6 +45,11 @@ def tracked_files() -> list[Path]:
     return [ROOT / item.decode() for item in result.stdout.split(b"\0") if item]
 
 
+def is_excluded(path: Path) -> bool:
+    rel = path.relative_to(ROOT)
+    return any(rel == prefix or prefix in rel.parents for prefix in EXCLUDED_PREFIXES)
+
+
 def sensitive_path_reason(path: Path) -> str | None:
     rel = path.relative_to(ROOT)
     name = rel.name
@@ -61,7 +71,7 @@ def main() -> int:
     violations: list[str] = []
 
     for path in tracked_files():
-        if not path.is_file():
+        if not path.is_file() or is_excluded(path):
             continue
 
         reason = sensitive_path_reason(path)
@@ -85,7 +95,7 @@ def main() -> int:
             print(f"- {violation}", file=sys.stderr)
         return 1
 
-    print("Secret scan passed: no high-confidence secret signatures found in tracked files.")
+    print("Secret scan passed: no high-confidence secret signatures found in first-party tracked files.")
     return 0
 
 
