@@ -85,8 +85,11 @@ jobs:
 
       - run: python -m pip install -r requirements-dev.lock
 
-      - name: Validate Compose syntax
+      - name: Validate upstream smoke Compose syntax
         run: docker compose --profile upstream-smoke config --quiet
+
+      - name: Validate reference Compose syntax
+        run: docker compose --profile reference config --quiet
 
       - name: Validate deployment invariants
         run: python scripts/validate_deployment.py
