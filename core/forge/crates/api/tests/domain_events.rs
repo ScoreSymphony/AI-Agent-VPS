@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 mod common;
 
-use api::routes::events::HistoricalDomainEventsResponse;
+use api_types::HistoricalDomainEventsResponse;
 use axum::{
     body::{to_bytes, Body},
     http::{header, Method, Request, StatusCode},
