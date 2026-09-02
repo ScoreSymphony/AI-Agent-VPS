@@ -10,3 +10,4 @@ htmlcov/
 .runtime/
 external/managed/*
 !external/managed/.gitkeep
+.aider*

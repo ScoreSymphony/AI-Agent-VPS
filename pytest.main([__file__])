@@ -1,0 +1,84 @@
+
+tests/test_ci_quality_gates.py
+```python
+"""
+Test cases for CI quality gates
+"""
+
+import os
+import subprocess
+import pytest
+import yaml
+
+
+def test_pr_template_exists():
+    """Test that PR template exists"""
+    assert os.path.exists(".github/PULL_REQUEST_TEMPLATE.md")
+
+
+def test_issue_templates_exist():
+    """Test that all issue templates exist"""
+    templates = [
+        ".github/ISSUE_TEMPLATE/feature_request.md",
+        ".github/ISSUE_TEMPLATE/bug_report.md",
+        ".github/ISSUE_TEMPLATE/architecture_decision_record.md",
+        ".github/ISSUE_TEMPLATE/upstream_update.md",
+        ".github/ISSUE_TEMPLATE/security_issue.md"
+    ]
+    
+    for template in templates:
+        assert os.path.exists(template), f"Issue template {template} is missing"
+
+
+def test_ci_workflow_exists():
+    """Test that CI workflow file exists"""
+    assert os.path.exists(".github/workflows/ci.yml")
+
+
+def test_repository_structure():
+    """Test that repository structure is correct"""
+    # Check core directories exist
+    core_dirs = ["core", "platform", "scripts", "docs"]
+    for directory in core_dirs:
+        assert os.path.exists(directory), f"Directory {directory} is missing"
+    
+    # Check that required files exist
+    required_files = [
+        "COMPONENTS.yaml",
+        "UPSTREAMS.yaml",
+        "CURRENT_STATE.md",
+        "ROADMAP.md",
+        "AGENTS.md",
+        "README.md",
+        ".env.example"
+    ]
+    
+    for file_path in required_files:
+        assert os.path.exists(file_path), f"Required file {file_path} is missing"
+
+
+def test_yaml_files_valid():
+    """Test that YAML files are valid"""
+    # Test COMPONENTS.yaml
+    with open("COMPONENTS.yaml", "r") as f:
+        yaml.safe_load(f)
+    
+    # Test UPSTREAMS.yaml
+    with open("UPSTREAMS.yaml", "r") as f:
+        yaml.safe_load(f)
+
+
+def test_license_check_script():
+    """Test that license check script exists and is executable"""
+    assert os.path.exists("scripts/check_licenses.py")
+    assert os.access("scripts/check_licenses.py", os.X_OK)
+
+
+def test_repository_validation_script():
+    """Test that repository validation script exists and is executable"""
+    assert os.path.exists("scripts/validate_repository.sh")
+    assert os.access("scripts/validate_repository.sh", os.X_OK)
+
+
+if __name__ == "__main__":
+    pytest.main([__file__])
