@@ -44,6 +44,17 @@ def _environment() -> int:
     return 0
 
 
+def _retry_once(marker_name: str, output_name: str) -> int:
+    marker = Path(marker_name)
+    if not marker.exists():
+        marker.write_text("retry-required\n", encoding="utf-8", newline="\n")
+        print("retry required", file=sys.stderr)
+        return 75
+    Path(output_name).write_text("retry succeeded\n", encoding="utf-8", newline="\n")
+    print("retry succeeded")
+    return 0
+
+
 def main(argv: list[str]) -> int:
     if not argv:
         return 64
@@ -62,6 +73,8 @@ def main(argv: list[str]) -> int:
         time.sleep(float(arguments[0]))
         print("finished sleeping")
         return 0
+    if operation == "retry-once" and len(arguments) == 2:
+        return _retry_once(arguments[0], arguments[1])
 
     return 64
 
