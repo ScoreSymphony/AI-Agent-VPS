@@ -31,8 +31,16 @@ separate external programs, but they require an explicit boundary and
 distribution review. They must not be silently linked into or vendored within
 the MIT core.
 
-## CI rule
+## CI rules
 
 `scripts/validate_baseline.py` rejects a bundled component whose declared
-license is not MIT. A future dependency scanner will extend this check to
-transitive package locks.
+license is not MIT.
+
+Pull requests are additionally checked with GitHub Dependency Review. Newly
+introduced dependencies must use one of the default allowlisted licenses above
+unless the repository policy is intentionally updated in the same reviewed
+change. High-severity dependency vulnerabilities fail the security gate.
+
+These checks complement provenance review for managed/remote external tools;
+they do not redefine an external process boundary as an in-repository MIT
+component.

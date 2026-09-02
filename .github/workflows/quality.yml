@@ -23,9 +23,9 @@ jobs:
         python-version: ["3.11", "3.12"]
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
@@ -40,11 +40,14 @@ jobs:
 
       - run: python -m compileall -q src scripts tests
 
-      - run: python scripts/validate_baseline.py
+      - name: Validate repository baseline
+        run: python scripts/validate_baseline.py
 
-      - run: python scripts/validate_deployment.py
+      - name: Validate deployment contracts
+        run: python scripts/validate_deployment.py
 
-      - run: pytest -q
+      - name: Run Python unit, contract, integration, and regression tests
+        run: pytest -q
 
   forge-rust:
     runs-on: ubuntu-latest
@@ -55,7 +58,7 @@ jobs:
         working-directory: core/forge
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Show Rust toolchain
         run: rustc --version && cargo --version
@@ -75,9 +78,9 @@ jobs:
     timeout-minutes: 5
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.12"
           cache: pip
@@ -92,6 +95,7 @@ jobs:
         run: python scripts/validate_deployment.py
 
   validate:
+    name: required-quality-gate
     runs-on: ubuntu-latest
     timeout-minutes: 2
 
@@ -101,4 +105,4 @@ jobs:
       - compose-contract
 
     steps:
-      - run: echo "Platform quality gates passed"
+      - run: echo "Platform baseline, contract, integration, and regression quality gates passed"
