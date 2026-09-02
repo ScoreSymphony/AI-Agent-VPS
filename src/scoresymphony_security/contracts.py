@@ -79,11 +79,14 @@ class AuthorizationRequest:
     principal: Principal
     action: str
     resource: ResourceRef
+    operation_digest: str
     context: Mapping[str, str] = field(default_factory=dict, hash=False)
 
     def __post_init__(self) -> None:
         if not self.action.strip():
             raise ValueError("action must not be empty")
+        if not self.operation_digest.strip():
+            raise ValueError("operation_digest must not be empty")
         object.__setattr__(self, "context", MappingProxyType(dict(self.context)))
 
 
