@@ -1,9 +1,8 @@
 from __future__ import annotations
 
 import argparse
-import os
+import secrets
 import subprocess
-import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -11,7 +10,6 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 ENV_PATH = ROOT / ".env"
 REFERENCE_PROFILE = "reference"
-PLACEHOLDER_PREFIX = "replace-with-local-"
 
 
 class ReferenceDeploymentError(RuntimeError):
@@ -45,14 +43,27 @@ def load_env(path: Path = ENV_PATH) -> dict[str, str]:
     return values
 
 
-def require_secret(values: dict[str, str], key: str, *, prefix: str | None = None) -> str:
-    value = values.get(key, "")
-    if not value or value.startswith(PLACEHOLDER_PREFIX):
-        raise ReferenceDeploymentError(f"{key} is not provisioned in .env")
+def secret_path(values: dict[str, str], key: str) -> Path:
+    raw = values.get(key, "").strip()
+    if not raw:
+        raise ReferenceDeploymentError(f"{key} is not configured in .env")
+    path = Path(raw)
+    if not path.is_absolute():
+        path = ROOT / path
+    return path.resolve()
+
+
+def read_secret_file(values: dict[str, str], key: str, *, prefix: str | None = None) -> str:
+    path = secret_path(values, key)
+    if not path.is_file():
+        raise ReferenceDeploymentError(f"secret file is missing: {path}")
+    value = path.read_text(encoding="utf-8").strip()
+    if not value:
+        raise ReferenceDeploymentError(f"secret file is empty: {path}")
     if prefix is not None and not value.startswith(prefix):
-        raise ReferenceDeploymentError(f"{key} must use the expected {prefix!r} credential format")
+        raise ReferenceDeploymentError(f"secret in {path} must use the expected {prefix!r} credential format")
     if len(value) < 24:
-        raise ReferenceDeploymentError(f"{key} is unexpectedly short")
+        raise ReferenceDeploymentError(f"secret in {path} is unexpectedly short")
     return value
 
 
@@ -63,6 +74,26 @@ def docker_preflight() -> None:
         raise ReferenceDeploymentError("Docker with the Compose plugin is required") from exc
 
 
+def init_secrets() -> None:
+    values = load_env()
+    forge_path = secret_path(values, "SCORESYMPHONY_FORGE_TOKEN_FILE")
+    gateway_path = secret_path(values, "SCORESYMPHONY_GATEWAY_TOKEN_FILE")
+    forge_path.parent.mkdir(parents=True, exist_ok=True)
+    gateway_path.parent.mkdir(parents=True, exist_ok=True)
+
+    if gateway_path.exists() and gateway_path.read_text(encoding="utf-8").strip():
+        print(f"gateway secret already exists; not replacing: {gateway_path}")
+    else:
+        gateway_path.write_text(secrets.token_urlsafe(48) + "\n", encoding="utf-8")
+        try:
+            gateway_path.chmod(0o600)
+        except OSError:
+            pass
+        print(f"generated gateway secret: {gateway_path}")
+
+    print(f"write the Forge PAT created through the local Forge auth API to: {forge_path}")
+
+
 def preflight() -> None:
     docker_preflight()
     values = load_env()
@@ -71,8 +102,8 @@ def preflight() -> None:
         raise ReferenceDeploymentError(
             "reference deployment must remain loopback-bound until the production security baseline is complete"
         )
-    require_secret(values, "FORGE_BEARER_TOKEN", prefix="fg_")
-    require_secret(values, "SCORESYMPHONY_GATEWAY_BEARER_TOKEN")
+    read_secret_file(values, "SCORESYMPHONY_FORGE_TOKEN_FILE", prefix="fg_")
+    read_secret_file(values, "SCORESYMPHONY_GATEWAY_TOKEN_FILE")
     compose("config", "--quiet")
     print("reference deployment preflight passed")
 
@@ -166,6 +197,7 @@ def restore(archive: Path, *, confirmed: bool) -> None:
 def parser() -> argparse.ArgumentParser:
     result = argparse.ArgumentParser(description="Operate the loopback-only ScoreSymphony reference deployment")
     sub = result.add_subparsers(dest="command", required=True)
+    sub.add_parser("init-secrets")
     sub.add_parser("preflight")
     sub.add_parser("start")
     sub.add_parser("stop")
@@ -184,7 +216,9 @@ def parser() -> argparse.ArgumentParser:
 def main() -> None:
     args = parser().parse_args()
     try:
-        if args.command == "preflight":
+        if args.command == "init-secrets":
+            init_secrets()
+        elif args.command == "preflight":
             preflight()
         elif args.command == "start":
             start()
