@@ -8,6 +8,8 @@ __pycache__/
 .coverage
 htmlcov/
 .runtime/
+backups/
+*.tar
 external/managed/*
 !external/managed/.gitkeep
 .aider*
