@@ -1,4 +1,4 @@
-name: Baseline quality
+name: Platform quality
 
 on:
   pull_request:
@@ -9,15 +9,44 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: quality-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  validate:
+  python-quality:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: ${{ matrix.python-version }}
           cache: pip
+          cache-dependency-path: requirements-dev.lock
       - run: python -m pip install -r requirements-dev.lock
+      - run: python -m pip check
+      - run: python -m compileall -q src scripts tests
       - run: python scripts/validate_baseline.py
-      - run: pytest
+      - run: python scripts/validate_deployment.py
+      - run: pytest -q
+
+  compose-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-dev.lock
+      - run: python -m pip install -r requirements-dev.lock
+      - name: Validate Compose syntax
+        run: docker compose --profile upstream-smoke config --quiet
+      - name: Validate deployment invariants
+        run: python scripts/validate_deployment.py
