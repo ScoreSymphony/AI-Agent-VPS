@@ -23,6 +23,7 @@ def test_deployment_validator_passes(repo_root: Path) -> None:
 def test_forge_is_loopback_bound_and_persistent_by_default(repo_root: Path) -> None:
     forge = load_compose(repo_root)["services"]["forge-upstream"]
     assert "${SCORESYMPHONY_BIND_HOST:-127.0.0.1}:${SCORESYMPHONY_FORGE_PORT:-8080}:8080" in forge["ports"]
+    assert forge["environment"]["FORGE_SERVER_BIND"] == "0.0.0.0:8080"
     assert "forge-data:/data" in forge["volumes"]
 
 
