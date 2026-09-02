@@ -29,6 +29,9 @@ continue without changing Forge lifecycle ownership.
   or merge authority are removed from V1.
 - Forge now has an authenticated public historical domain-event read mode backed
   by its persisted domain events, with route-level tests merged in PR #10.
+- A transport-neutral deterministic shell reference worker is merged in PR #24,
+  including bounded executable allowlisting, workspace confinement, deterministic
+  environment/result handling, timeout limits, fixtures, and focused tests.
 - Security contract primitives now define principals, credentials, resource
   scopes, authorization requests/decisions, approval records, and shared ports.
 - Deterministic reference policy semantics are default-deny with precedence
@@ -51,6 +54,8 @@ continue without changing Forge lifecycle ownership.
   `events.resync_required` on lag.
 - Forge also exposes the authenticated historical domain-event read capability
   required for adapter recovery after a sequence cursor.
+- The shell worker is a bounded execution primitive, not an orchestrator and not
+  an owner of Forge lifecycle, approvals, recovery, or merge policy.
 - The V1 command `actor` is asserted command data and is not authentication
   evidence; runtime ingress must bind it to an authenticated principal.
 
@@ -59,7 +64,7 @@ continue without changing Forge lifecycle ownership.
 - Running ScoreSymphony command HTTP endpoint and SSE projection adapter.
 - Durable command idempotency integration against Forge-owned state/events.
 - Hermes-side V1 tools/adapter.
-- Minimal shell-worker end-to-end vertical slice.
+- Integration of the shell reference worker into the Forge-backed vertical slice.
 - Production authentication middleware and credential provisioning.
 - Persistent RBAC/policy configuration, role bindings, approval storage, atomic
   approval consumption, and security audit storage.
@@ -84,6 +89,9 @@ In parallel, the security work can proceed without editing `core/forge`:
 3. add persistent approvals with atomic approved-to-consumed transition;
 4. add secret-safe audit events;
 5. prove denied or unapproved requests never reach the Forge adapter.
+
+The shell worker can also be integrated behind Forge only after the adapter/runtime
+seam is stable enough to preserve Forge-owned dispatch and lifecycle semantics.
 
 ## Blockers
 
