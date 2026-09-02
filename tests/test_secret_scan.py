@@ -12,12 +12,14 @@ SPEC.loader.exec_module(scan_secrets)
 
 
 def test_detects_private_key_header() -> None:
-    findings = scan_secrets.scan_text("-----BEGIN PRIVATE KEY-----\nredacted\n")
+    private_key_header = "-----BEGIN " + "PRIVATE KEY-----"
+    findings = scan_secrets.scan_text(private_key_header + "\nredacted\n")
     assert "private key" in findings
 
 
 def test_detects_github_token_shape() -> None:
-    findings = scan_secrets.scan_text("ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890abcd")
+    token = "ghp_" + ("A" * 40)
+    findings = scan_secrets.scan_text(token)
     assert "GitHub token" in findings
 
 
