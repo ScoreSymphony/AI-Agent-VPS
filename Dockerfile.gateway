@@ -1,0 +1,19 @@
+FROM python:3.12-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+WORKDIR /opt/scoresymphony
+
+COPY pyproject.toml setup.py MANIFEST.in LICENSE ./
+COPY platform/contracts/v1 ./platform/contracts/v1
+COPY src ./src
+
+RUN python -m pip install --no-cache-dir . \
+    && groupadd --system --gid 10001 scoresymphony \
+    && useradd --system --uid 10001 --gid scoresymphony --no-create-home scoresymphony
+
+USER scoresymphony:scoresymphony
+EXPOSE 8080
+
+ENTRYPOINT ["scoresymphony-gateway"]

@@ -1,6 +1,9 @@
 # Deployment and observability baseline
 
-This document defines the platform-quality baseline for the current upstream smoke deployment. It intentionally does not make assumptions about unfinished Forge recovery/history APIs or future Hermes runtime contracts.
+This document defines the platform-quality baseline for the current upstream
+smoke deployment. Forge recovery and the ScoreSymphony gateway now have stable
+code-level contracts, but are not yet wired into this Compose profile because
+shared authentication bootstrap and secret injection remain unresolved.
 
 ## Scope
 
@@ -16,7 +19,8 @@ The externally mapped Forge port is controlled by `SCORESYMPHONY_FORGE_PORT` and
 
 Forge has a container liveness probe that checks whether its local TCP listener on port `8080` accepts connections. This is deliberately a transport-level liveness check only.
 
-It must not call historical-event, recovery, SSE, or other domain APIs. Those interfaces are owned by the runtime/integration workstreams and may receive readiness checks only after their contracts are stable.
+It must not call historical-event, recovery, SSE, or other domain APIs. The
+gateway owns the separate semantic readiness check for authenticated recovery.
 
 Hermes does not yet have a semantic container healthcheck in the platform compose file. Docker still observes process exit, while a real Hermes readiness probe is deferred until the gateway exposes a stable health contract that the platform can depend on without guessing.
 
@@ -53,6 +57,14 @@ docker compose --profile upstream-smoke config --quiet
 ## CI gates
 
 The root quality workflow validates Python 3.11 and 3.12, dependency consistency, byte compilation, repository baseline invariants, deployment invariants, tests, and Compose syntax. CI deliberately avoids requiring the unfinished recovery API.
+
+## Gateway boundary
+
+The separately buildable `Dockerfile.gateway` runs as a non-root user and
+defaults to a loopback listener outside containers. See
+`docs/operations/INTEGRATION_GATEWAY.md`. It must not be added to the shared
+profile until its Forge bearer credential is provisioned through an actual
+secret path.
 
 ## Next observability step
 

@@ -7,12 +7,14 @@ from scoresymphony_contracts.models import (
     CommandKind,
     CommandReceipt,
     CommandV1,
+    EventV1,
     JsonObject,
     JsonValue,
     SubmissionStatus,
     readonly_json,
 )
 
+from .events import ForgeEventAdapter, ForgeEventPage
 from .transport import ForgeDispatchUncertainError, ForgeHttpResponse, ForgeHttpTransport
 
 
@@ -179,3 +181,20 @@ class ForgeCommandAdapter:
         if isinstance(value, Mapping):
             return {str(key): cls._json_value(item) for key, item in value.items()}
         raise ForgeAdapterMappingError(f"payload contains unsupported value: {value!r}")
+
+
+class ForgeIntegrationAdapter:
+    """Composite V1 command/recovery port over one public Forge transport."""
+
+    def __init__(self, transport: ForgeHttpTransport, *, event_page_limit: int = 100) -> None:
+        self._commands = ForgeCommandAdapter(transport)
+        self._events = ForgeEventAdapter(transport, page_limit=event_page_limit)
+
+    def submit(self, command: CommandV1) -> CommandReceipt:
+        return self._commands.submit(command)
+
+    def get_events(self, after_sequence: int | None = None) -> tuple[EventV1, ...]:
+        return self._events.get_events(after_sequence)
+
+    def get_event_page(self, after_sequence: int | None = None) -> ForgeEventPage:
+        return self._events.get_event_page(after_sequence)

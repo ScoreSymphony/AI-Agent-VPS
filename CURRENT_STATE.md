@@ -4,8 +4,10 @@ Updated: 2026-09-02
 
 ## Current objective
 
-Finish the verified V1 boundary and provide the minimum Forge public recovery
-surface required before the first production-quality Hermes-Forge adapter.
+Build the first production-quality ScoreSymphony-to-Forge adapter and integrated
+kernel on top of the verified V1 boundary, authenticated Forge historical event
+recovery, the deterministic shell-worker acceptance surface, and the shared
+security contracts without changing Forge lifecycle ownership.
 
 ## Implemented in this branch
 
@@ -39,6 +41,35 @@ surface required before the first production-quality Hermes-Forge adapter.
   declared-write-path check.
 - Baseline validation, Pytest, packaging checks, and GitHub Actions definitions
   remain present.
+- Forge exposes an authenticated historical JSON read on `/api/v1/events` with
+  exclusive cursor, bounded limit, ordered public DTOs, and generated client
+  bindings while preserving the parameterless live SSE route.
+- Every V1 command maps to a verified public Forge HTTP operation through the
+  ScoreSymphony-owned command adapter.
+- The Forge recovery adapter validates page ordering and cursors, advances over
+  unsupported internal Forge events, and projects supported lifecycle events
+  through the canonical V1 validator.
+- A concrete standard-library HTTP transport supplies bearer authentication,
+  bounded timeouts, JSON handling, and cross-origin path protection.
+- `ForgeIntegrationAdapter` composes command submission and durable event reads
+  without importing Forge internals or creating a second lifecycle state.
+- A startable authenticated ScoreSymphony gateway validates raw commands,
+  exposes command receipts and cursor-based recovery pages, separates liveness
+  from Forge-backed readiness, caps request bodies, and fails closed on invalid
+  upstream history.
+- A non-root gateway container image and runtime configuration contract are
+  present; Compose wiring is intentionally deferred until Forge authentication
+  bootstrap and secret injection are defined.
+- A Hermes-facing authenticated gateway client serializes immutable V1
+  commands, validates matching receipts and recovery pages, advances across
+  gateway-reported internal-event gaps, and retains no competing lifecycle or
+  cursor state.
+- A low-footprint `scoresymphony-hermes` CLI exposes command submission and
+  cursor-based event reads through Hermes' existing terminal capability without
+  modifying Hermes core or adding a permanent model-tool schema.
+- An in-process integration acceptance test now crosses Hermes serialization,
+  authenticated gateway ingress, Forge command mapping, historical Forge event
+  projection, gateway recovery output, and Hermes-side V1 validation.
 
 ## Verified integration facts
 
@@ -50,38 +81,33 @@ surface required before the first production-quality Hermes-Forge adapter.
   lifecycle information that can be normalized into V1.
 - Forge `/api/v1/events` is a broadcast SSE stream and signals
   `events.resync_required` on lag.
-- Forge internally persists ordered domain events and consumer cursors, but no
-  equivalent public historical cursor-read endpoint exists yet.
+- Forge's authenticated historical read exposes those persisted events as
+  stable public DTOs and is covered by Rust API tests and CI.
 
 ## Not implemented yet
 
-- Authenticated public Forge historical domain-event read/recovery endpoint.
-- Running ScoreSymphony command HTTP endpoint and SSE projection adapter.
+- Live SSE projection adapter.
 - Durable command idempotency integration against Forge-owned state/events.
-- Hermes-side V1 tools/adapter.
+- Optional service-gated Hermes tool registration around the ScoreSymphony-owned
+  gateway client if terminal/CLI ergonomics prove insufficient.
 - Forge-integrated shell-worker end-to-end vertical slice.
-- Production authentication/authorization design beyond existing Forge auth.
+- Integration of the pending shared security-contract branch into command
+  ingress and worker execution.
 - Deployment, Control Plane, agent registry, managed externals, specialist
   agents, and KVM placement.
 
 ## Next work package
 
-Add the smallest authenticated Forge public API surface that can read ordered
-persisted domain events after a sequence cursor. Follow the nested Forge rules:
-
-1. define stable API response/query types;
-2. implement a read-only authenticated route backed by `DomainEventRepo`;
-3. cover ordering, cursor, limit, authentication, and empty-result behavior;
-4. document the endpoint in Forge API docs and changelog;
-5. update generated TypeScript types if the public DTO is exported;
-6. keep existing live `/api/v1/events` SSE behavior unchanged.
-
-After that endpoint is proven, implement the ScoreSymphony adapter against the
-corrected V1 contract and the public Forge surfaces only.
+Promote the proven in-process integration slice to a process-level acceptance
+test using the Hermes CLI and gateway server, then connect Forge dispatch to the
+deterministic shell worker through Forge-owned lifecycle operations. Define
+Forge authentication bootstrap and secret injection before adding the gateway
+to Compose. Recovery consumers must persist cursors only after successful page
+processing.
 
 ## Blockers
 
-The V1-to-Forge command mapping is no longer a blocker. Production-grade event
-recovery remains blocked until the selected authenticated historical read
-surface is implemented and tested. The PR must not be merged without a full
-repository CI pass.
+Durable command idempotency is still unresolved: network/server failures cannot
+be retried blindly until a Forge-owned dedupe/recovery strategy is proven. Live
+SSE normalization also remains unimplemented. This branch must not be merged
+without a full repository CI pass, including the Forge Rust checks.

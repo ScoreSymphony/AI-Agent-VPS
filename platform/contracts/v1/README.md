@@ -39,9 +39,11 @@ state. Execution events carry `execution_id`; task/workspace/review/merge events
 carry only `task_id`. Terminal `command.*` events require `causation_id` to
 identify the command they complete.
 
-The live Forge SSE feed can be projected into these event types, but the current
-public SSE endpoint is a broadcast stream and is not itself durable historical
-replay. Recovery is a separate adapter concern.
+The live Forge SSE feed can be projected into these event types, but the public
+SSE endpoint is a broadcast stream and is not itself durable historical replay.
+The separate authenticated Forge historical read is consumed by
+`ForgeEventAdapter`; callers persist its returned page cursor, including across
+Forge-internal events that have no V1 projection.
 
 ## Runtime rules
 
