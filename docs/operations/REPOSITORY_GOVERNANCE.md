@@ -26,7 +26,7 @@ The quality gate currently aggregates:
 
 The security gate currently aggregates:
 
-- tracked-file secret scanning,
+- first-party tracked-file secret scanning,
 - pull-request dependency vulnerability review,
 - dependency license allowlist enforcement for newly introduced dependencies.
 
@@ -54,7 +54,7 @@ Where the GitHub plan/repository features support them, enable:
 - Secret Scanning,
 - Secret Scanning push protection.
 
-The in-repository secret scanner is a defense-in-depth control; it is not a replacement for GitHub Secret Scanning/push protection.
+The in-repository secret scanner is a defense-in-depth control for first-party tracked files. Vendored upstream snapshots under `core/forge/` and `core/hermes/` are excluded because their security/redaction tests and documentation intentionally contain credential-shaped fixtures. Whole-repository secret protection, including upstream snapshots and newly pushed history, must therefore use GitHub Secret Scanning/push protection when available.
 
 ## 4. Pull-request evidence
 
@@ -88,7 +88,7 @@ Security issues must not contain live credentials, private keys, tokens, or sens
 Third-party and GitHub-maintained actions must be pinned to a full commit SHA whenever practical. Keep a human-readable version comment next to the SHA, for example:
 
 ```yaml
-uses: actions/checkout@<full-commit-sha> # v4
+uses: actions/checkout@<full-commit-sha> # v7.0.1
 ```
 
 Version comments are informational; the commit SHA is the executable pin. Updating an action pin is a normal reviewed dependency change.
