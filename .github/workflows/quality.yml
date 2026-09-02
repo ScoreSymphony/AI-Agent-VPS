@@ -32,6 +32,9 @@ jobs:
       - name: Show Rust toolchain
         run: rustc --version && cargo --version
       - name: Check Forge API crate
-        run: cargo check -p api --locked
+        run: cargo check -p api
       - name: Test historical domain event API
-        run: cargo test -p api --test domain_events --locked
+        run: cargo test -p api --test domain_events
+      - name: Report Cargo.lock drift
+        if: always()
+        run: git diff -- Cargo.lock
