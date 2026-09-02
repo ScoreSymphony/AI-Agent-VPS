@@ -1,0 +1,70 @@
+name: Security and dependency policy
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  secret-scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.12"
+
+      - name: Scan tracked files for high-confidence secrets
+        run: python scripts/scan_secrets.py
+
+  dependency-review:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Review dependency vulnerabilities and licenses
+        uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          fail-on-severity: high
+          allow-licenses: MIT, ISC, BSD-2-Clause, BSD-3-Clause, Apache-2.0
+          comment-summary-in-pr: never
+
+  security-validate:
+    name: required-security-gate
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    needs:
+      - secret-scan
+      - dependency-review
+
+    steps:
+      - name: Verify security jobs
+        shell: bash
+        run: |
+          if [ "${{ needs.secret-scan.result }}" != "success" ]; then
+            echo "Secret scan did not pass."
+            exit 1
+          fi
+
+          dependency_result="${{ needs.dependency-review.result }}"
+          if [ "$dependency_result" != "success" ] && [ "$dependency_result" != "skipped" ]; then
+            echo "Dependency review did not pass."
+            exit 1
+          fi
+
+          echo "Security and dependency policy gates passed."
