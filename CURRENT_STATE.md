@@ -1,225 +1,304 @@
-# Current state
+# Current State
 
-Updated: 2026-09-02
+Updated: **2026-09-02**  
+Baseline classification: **Integrated Kernel in progress**  
+Production readiness: **not production-ready**
 
-## Current objective
+## 1. Current objective
 
-Build the first production-quality ScoreSymphony-to-Forge adapter and integrated
-kernel on top of the verified V1 boundary, authenticated Forge historical event
-recovery, the deterministic shell-worker acceptance surface, and the shared
-security contracts without changing Forge lifecycle ownership.
+Complete the first production-quality ScoreSymphony-to-Forge Integrated Kernel without changing the authority model:
 
-## Implemented in this branch
+- Hermes remains the sole intelligent orchestrator.
+- Forge remains the canonical deterministic task, execution, workspace, worker dispatch, review, gate and merge authority.
+- ScoreSymphony owns the versioned integration contracts, gateway/adapters, project-specific security integration and future Control Plane.
+- Workers remain bounded execution primitives.
 
-* Hermes remains the sole intelligent orchestrator.
-* Forge remains the deterministic task, execution, workspace, review, gate, and
-  merge authority.
-* V1 command submission is separated from terminal command outcomes through
-  `CommandReceipt` and terminal `command.*` events.
-* Read/query concerns are separated from the command plane.
-* Parsed nested contract data is recursively read-only after validation.
-* Terminal command events require command causation.
-* ADR-0001 accurately describes HTTP/JSON + SSE as the live transport.
-* ADR-0002 is accepted and aligns V1 to verified Forge lifecycle operations.
-* `create_task` carries explicit Forge `project_id` scope.
-* Task mutations carry the expected Forge task `version`.
-* `run_id` and run-oriented commands/events are replaced by Forge
-  `execution_id` / execution terminology.
-* Commands that would bypass or duplicate Forge workspace, test, review, worker,
-  or merge authority are removed from V1.
-* Contract fixtures, compatibility checks, semantic rejection tests, and runtime
-  tests cover the corrected vocabulary.
-* Forge exposes an authenticated historical JSON read on `/api/v1/events` backed
-  by persisted domain events, with exclusive cursor, bounded limit, ordered
-  public DTOs, generated client bindings, route-level tests, and Rust CI
-  coverage while preserving the parameterless live SSE route.
-* Every V1 command maps to a verified public Forge HTTP operation through the
-  ScoreSymphony-owned command adapter.
-* The Forge recovery adapter validates page ordering and cursors, advances over
-  unsupported internal Forge events, and projects supported lifecycle events
-  through the canonical V1 validator.
-* A concrete standard-library HTTP transport supplies bearer authentication,
-  bounded timeouts, JSON handling, and cross-origin path protection.
-* `ForgeIntegrationAdapter` composes command submission and durable event reads
-  without importing Forge internals or creating a second lifecycle state.
-* A startable authenticated ScoreSymphony gateway validates raw commands,
-  exposes command receipts and cursor-based recovery pages, separates liveness
-  from Forge-backed readiness, caps request bodies, and fails closed on invalid
-  upstream history.
-* A Hermes-facing authenticated gateway client serializes immutable V1
-  commands, validates matching receipts and recovery pages, advances across
-  gateway-reported internal-event gaps, and retains no competing lifecycle or
-  cursor state.
-* A low-footprint `scoresymphony-hermes` CLI exposes command submission and
-  cursor-based event reads through Hermes' existing terminal capability without
-  modifying Hermes core or adding a permanent model-tool schema.
-* An in-process integration acceptance test crosses Hermes serialization,
-  authenticated gateway ingress, Forge command mapping, historical Forge event
-  projection, gateway recovery output, and Hermes-side V1 validation.
-* The transport-neutral deterministic shell-worker reference implementation
-  covers executable allowlisting, workspace confinement, deterministic
-  environment and result handling, predictable fixture changes, success,
-  failure, timeout, cooperative cancellation, and explicit caller-controlled
-  retry attempts without an LLM.
-* Shell-worker timeout and cancellation collection remain deadline-bounded when
-  a direct parent exits while descendants retain inherited pipes; POSIX
-  invocations use a dedicated process group for bounded descendant termination.
-* Shell-worker write policy is enforced through declared and allowlisted write
-  paths.
-* Workspace write-policy evidence includes relevant content changes and file-mode
-  changes, so a mode-only mutation such as an executable-bit change cannot
-  bypass the declared-write-path check.
-* The shell worker remains a bounded execution primitive rather than an
-  orchestrator or owner of Forge lifecycle, approvals, recovery, retry policy,
-  or merge policy.
-* Security contract primitives define principals, credentials, resource scopes,
-  authorization requests and decisions, approval records, and shared ports.
-* Deterministic reference policy semantics are default-deny with precedence
-  `DENY > REQUIRE_APPROVAL > ALLOW`.
-* Approval validation binds approval to the exact authorization request and
-  required policy, supports expiry, defaults to no self-approval, and models
-  consumed approvals for replay prevention.
-* The V1 command `actor` is asserted command data and is not authentication
-  evidence; runtime ingress must bind it to an authenticated principal.
-* Repository governance templates are present for implementation work, ADRs,
-  upstream updates, security hardening, and architecture-aware pull request
-  reviews.
-* Baseline validation, Pytest, packaging checks, deployment validation, Compose
-  validation, Forge Rust validation, and GitHub Actions quality gates are
-  present.
-* A non-root gateway container image and runtime configuration contract are
-  present; Compose wiring is intentionally deferred until Forge authentication
-  bootstrap and secret injection are defined.
+Historical Forge event recovery and deterministic shell-worker acceptance are no longer blockers. The immediate blockers are live-event integration, Forge-backed worker dispatch, durable command idempotency and the full process-level end-to-end proof.
 
-## Verified integration facts
+## 2. Baseline status summary
 
-* Forge task creation is project-scoped.
-* Forge task updates and task actions support optimistic concurrency.
-* Forge owns task start and dispatch, workspace creation, review and gates, and
-  merge.
-* Forge execution retry and cancellation have public execution endpoints.
-* Forge live events include task, workspace, execution, review, and merge
-  lifecycle information that can be normalized into V1.
-* Forge `/api/v1/events` remains the live broadcast SSE stream and signals
-  `events.resync_required` on lag.
-* Forge also exposes an authenticated historical domain-event read capability
-  backed by persisted domain events for recovery after an exclusive sequence
-  cursor.
-* The historical event surface exposes stable public DTOs and is covered by
-  Rust API tests and CI.
-* Historical recovery and deterministic shell-worker acceptance are therefore
-  no longer blockers for adapter integration.
-* The shell worker must remain behind Forge-owned dispatch and lifecycle
-  authority rather than becoming a parallel execution authority.
-* The V1 command `actor` must be bound to an authenticated principal at runtime;
-  it must never be treated as authentication evidence on its own.
+| Area | Status | Current meaning |
+|---|---|---|
+| Repository governance / CI | PARTIAL / ACTIVE | strong baseline exists; fresh repo settings must be recreated |
+| V1 Forge-aligned contracts | COMPLETE FOR CURRENT KERNEL | command/event vocabulary and concurrency semantics established |
+| Historical Forge Domain Event Read | COMPLETE | authenticated persisted-event cursor API exists and is tested |
+| Forge command adapter | PARTIAL / ADVANCED | current V1 commands map to public Forge operations; durable idempotency remains |
+| ScoreSymphony HTTP gateway | PARTIAL / ADVANCED | authenticated command + historical read + health/readiness exist |
+| Live Forge SSE -> V1 | NOT COMPLETE | immediate critical-path work |
+| Hermes gateway client / CLI | PARTIAL / ADVANCED | usable command/read path exists; full process E2E still missing |
+| Deterministic Shell Worker | COMPLETE AS ACCEPTANCE PRIMITIVE | bounded worker behavior accepted; Forge dispatch wiring still missing |
+| Security contracts | COMPLETE AS FOUNDATION | contracts/policy/approval semantics exist; production persistence/enforcement missing |
+| Integrated Kernel E2E | PARTIAL | in-process integration exists; Forge->worker and live-event process E2E missing |
+| Recovery / durable idempotency | EARLY / PARTIAL | historical recovery exists; restart/dedup/replay ownership still incomplete |
+| Reference deployment | PARTIAL | validation/Compose basics and gateway image exist; production wiring deferred |
+| Observability | BASELINE ONLY | lifecycle metrics, correlation, alerts and operator diagnostics need expansion |
+| Control Plane | NOT IMPLEMENTED | later release gate |
+| Agent Registry / Scheduler | NOT IMPLEMENTED | later release gate |
+| Component Manager | NOT IMPLEMENTED | later release gate |
+| Research / domain agents | NOT IMPLEMENTED | later release gate |
+| Production hardening | NOT COMPLETE | final security/recovery/load/upgrade acceptance remains |
 
-## Not implemented yet
+## 3. Implemented and verified baseline
 
-* Live Forge SSE projection into canonical V1 events.
-* Process-level Hermes CLI → gateway → Forge acceptance coverage.
-* Durable command idempotency integration against Forge-owned state and events.
-* Forge-backed dispatch wiring for the deterministic shell-worker reference
-  implementation.
-* Full Forge-integrated shell-worker end-to-end vertical slice.
-* Integration of shared security contracts into command ingress and worker
-  dispatch.
-* Production authentication middleware and credential provisioning.
-* Forge authentication bootstrap and production secret injection.
-* Persistent RBAC and policy configuration.
-* Persistent role bindings.
-* Persistent approval storage with atomic approval consumption.
-* Security audit storage and audit-event wiring.
-* Optional service-gated Hermes tool registration around the
-  ScoreSymphony-owned gateway client if terminal/CLI ergonomics prove
-  insufficient.
-* Production Compose wiring for the ScoreSymphony gateway.
-* Control Plane.
-* Agent registry.
-* Managed externals.
-* Specialist agents.
-* Final multi-VPS placement and operations wiring.
+### 3.1 Architecture and V1 contracts
 
-## Next work package
+- Hermes is the sole intelligent orchestrator.
+- Forge is the deterministic lifecycle authority for projects/tasks, executions, workspaces, worker dispatch, test/evidence state, reviews, gates and merge.
+- V1 command submission is separated from terminal outcomes through `CommandReceipt` and terminal `command.*` events.
+- Read/query concerns are separated from the command plane.
+- Parsed nested contract data is recursively read-only after validation.
+- Terminal command events require command causation.
+- `create_task` carries explicit Forge `project_id` scope.
+- Task mutations carry the expected Forge task `version` for optimistic concurrency.
+- `run_id` and obsolete run-oriented vocabulary were replaced with `execution_id` / Forge execution terminology.
+- Commands that would bypass Forge workspace/test/review/worker/merge authority were removed from V1.
+- Contract fixtures, compatibility checks, semantic rejection tests and runtime tests cover the corrected vocabulary.
 
-The immediate critical path is to promote the proven integration components into
-a process-level and Forge-owned execution vertical slice.
+Current V1 commands:
 
-1. Add a process-level acceptance test using the `scoresymphony-hermes` CLI and
-   the ScoreSymphony gateway server.
-2. Implement live Forge SSE consumption and normalize supported Forge lifecycle
-   events into canonical V1 events.
-3. Reuse authenticated historical event recovery for reconnect and
-   `events.resync_required` handling.
-4. Ensure recovery consumers persist cursors only after successful page
-   processing.
-5. Preserve command causation, correlation, explicit adapter failures, and
-   Forge-owned lifecycle state throughout live and historical event handling.
-6. Define Forge authentication bootstrap and secret injection before adding the
-   gateway to production Compose.
-7. Connect Forge dispatch to the deterministic shell worker through Forge-owned
-   lifecycle operations rather than directly from Hermes or the gateway.
-8. Cover command submission, live events, historical recovery, worker dispatch,
-   cancellation, retry behavior, worker evidence, and failure handling in an
-   end-to-end vertical slice.
-9. Resolve durable command idempotency using Forge-owned state or events before
-   allowing blind retry of ambiguous command submissions.
+- `create_task`
+- `update_task`
+- `start_task`
+- `submit_task`
+- `request_changes_task`
+- `approve_task`
+- `cancel_task`
+- `retry_execution`
+- `cancel_execution`
 
-In parallel, security implementation should proceed behind the existing shared
-security ports:
+### 3.2 Historical Forge event recovery
 
-1. bind authenticated principals to V1 `actor` assertions at ingress;
-2. define and enforce canonical operation serialization and digests;
-3. add persistent role and policy configuration;
-4. add persistent role bindings;
-5. add persistent approvals with atomic approved-to-consumed transition;
-6. re-evaluate authorization immediately before approval consumption and
-   dispatch;
-7. add secret-safe audit events and persistent audit storage;
-8. prove denied, stale-policy, mismatched-payload, expired, consumed, or
-   unapproved requests never reach the Forge adapter or worker dispatch.
+Forge exposes an authenticated historical JSON read on `/api/v1/events` backed by persisted domain events. The implemented surface includes:
 
-Repository and CI hardening should continue alongside runtime work:
+- exclusive sequence cursor;
+- bounded `limit`;
+- ordered public DTOs;
+- stable API types;
+- generated client bindings where required;
+- route-level tests;
+- Forge Rust CI coverage;
+- unchanged parameterless live SSE behavior.
 
-1. keep Python, Compose, deployment, and Forge Rust checks as required quality
-   gates;
-2. keep governance and security reporting workflows aligned with repository
-   policy;
-3. normalize and lock Forge dependency state once the current Cargo lockfile
-   drift is resolved;
-4. keep `CURRENT_STATE.md`, architecture documentation, and roadmap documents
-   factual as implementation progresses.
+The ScoreSymphony recovery adapter validates page ordering and cursor behavior, rejects malformed/inconsistent recovery responses fail-closed, advances across unsupported internal Forge events without losing the durable cursor position, and projects supported Forge lifecycle events through the canonical V1 validator.
 
-## Blockers
+**Conclusion:** Historical Domain Event Read is complete for the current kernel and is no longer an integration blocker.
 
-The historical recovery surface and deterministic shell-worker acceptance
-surface are no longer blockers.
+### 3.3 Forge command adapter and HTTP transport
 
-The remaining critical-path risks are:
+- Every current V1 command maps to a verified public Forge HTTP operation.
+- Project/task/execution identifiers and task versions are carried through the public boundary.
+- A ScoreSymphony-owned HTTP transport provides bearer authentication, bounded timeouts, JSON handling and path/origin protection.
+- `ForgeIntegrationAdapter` composes command submission and historical reads without importing private Forge internals or creating a second lifecycle database.
 
-* correct live-event projection and reconnect/resync behavior;
-* Forge-backed shell-worker dispatch without creating a parallel lifecycle;
-* durable command idempotency for ambiguous network or server failures;
-* production authentication bootstrap and secret provisioning;
-* security-gate integration before command execution and worker dispatch;
-* successful process-level and end-to-end acceptance coverage.
+Still missing is a proven durable deduplication/recovery strategy for ambiguous command submissions. Until then, ambiguous transport failures must not trigger blind retries.
 
-Durable command idempotency remains unresolved. Network or server failures must
-not cause command submission to be retried blindly until a Forge-owned
-deduplication or recovery strategy has been proven.
+### 3.4 ScoreSymphony Gateway and Hermes-side integration
 
-Security contracts are prepared, but production authentication, persistent
-authorization policy, role bindings, approvals, atomic approval consumption,
-and audit wiring must not be described as operational until those integrations
-and their tests exist.
+Implemented:
 
-The gateway container and runtime configuration exist, but production Compose
-wiring must remain deferred until Forge authentication bootstrap and secret
-injection are explicitly defined.
+- authenticated ScoreSymphony gateway;
+- `POST /v1/commands`;
+- `GET /v1/events?after_sequence=N` historical recovery path;
+- liveness and Forge-backed readiness separation;
+- bounded request bodies;
+- fail-closed validation of invalid upstream history;
+- separate credentials for Hermes -> Gateway and Gateway -> Forge;
+- Hermes-facing authenticated gateway client;
+- `scoresymphony-hermes` CLI for low-footprint command submission/event reads;
+- in-process acceptance path across Hermes serialization, gateway ingress, Forge mapping, historical event projection and Hermes V1 validation.
 
-The shell-worker reference implementation is sufficiently defined for
-integration work, but it must remain behind Forge-owned dispatch and lifecycle
-authority rather than becoming a parallel execution authority.
+Not yet complete:
 
-This branch should not be merged until the full repository quality-gate suite,
-including Forge Rust checks, passes.
+- process-level Hermes CLI -> real gateway server -> Forge acceptance test;
+- canonical live SSE event projection and reconnect/resync;
+- optional service-gated permanent Hermes tool registration if CLI ergonomics later prove insufficient.
+
+### 3.5 Deterministic Shell Worker
+
+The shell-worker acceptance primitive is complete for the current reference scope:
+
+- explicit executable allowlisting;
+- workspace confinement;
+- deterministic execution environment/result normalization;
+- bounded command timeout;
+- success and non-zero failure handling;
+- cooperative cancellation;
+- caller-controlled explicit retry attempts;
+- POSIX process-group termination for bounded descendant cleanup;
+- declared and allowlisted write paths;
+- deterministic `changed_paths` evidence;
+- mode-only changes included in write-policy evidence;
+- deterministic fixture workspace/tests.
+
+The worker deliberately owns **no** orchestration, lifecycle, review, approval, merge, recovery or autonomous retry policy.
+
+Still missing: Forge-owned dispatch wiring and the complete Forge-integrated worker lifecycle E2E.
+
+### 3.6 Security foundation
+
+Shared contracts and deterministic reference semantics exist for principals and credentials, authorization/resource/scope requests, policy decisions, operation digests, approval requests/records, expiry, self-approval policy and consumed approval state against replay.
+
+Reference policy precedence is:
+
+```text
+DENY > REQUIRE_APPROVAL > ALLOW
+```
+
+The V1 `actor` field is asserted command data and is not authentication evidence. Production ingress must bind it to an authenticated principal.
+
+Still missing:
+
+- production authentication middleware/provisioning;
+- persistent roles, policies and bindings;
+- persistent approvals and atomic approval consumption;
+- re-authorization before protected dispatch;
+- persistent secret-safe audit storage/events;
+- complete command-ingress and worker-dispatch enforcement;
+- Forge authentication bootstrap and production secret injection.
+
+### 3.7 Repository, CI, deployment and provenance
+
+Present:
+
+- repository governance/issue/PR templates;
+- baseline validation;
+- Python/Pytest and packaging checks;
+- deployment validation;
+- Compose validation;
+- Forge Rust validation;
+- non-root gateway container image;
+- runtime configuration contract;
+- pinned Forge/Hermes upstream metadata in `UPSTREAMS.yaml`;
+- third-party provenance/license documentation in `THIRD_PARTY_NOTICES.md`.
+
+Production gateway Compose wiring is intentionally not claimed complete until Forge authentication bootstrap and secret injection are defined.
+
+## 4. Not implemented yet
+
+The following must not be described as operational or complete:
+
+- live Forge SSE -> canonical V1 event projection;
+- race-safe catch-up -> live transition;
+- reconnect and `events.resync_required` handling through Historical Read;
+- durable consumer cursor persistence policy;
+- process-level Hermes CLI -> Gateway -> Forge acceptance;
+- durable command idempotency against Forge-owned state/events;
+- Forge-owned dispatch wiring for the deterministic shell worker;
+- full Hermes -> Gateway -> Forge -> Worker -> Review/Gate -> terminal event E2E;
+- production authentication and credential provisioning;
+- persistent RBAC/policies/role bindings;
+- persistent approvals with atomic consumption;
+- production audit storage;
+- production gateway Compose wiring;
+- complete restart/orphan/lease/replay recovery;
+- Agent Registry;
+- Resource Scheduler / capacity control;
+- worker families beyond the shell-worker reference;
+- independent ScoreSymphony reviewer path;
+- model/coding backend adapter layer;
+- ScoreSymphony Control Plane;
+- Multi-Agent Terminal and Workflow Graph;
+- Component Manager and managed external pilot;
+- Research Broker;
+- user-facing secure file/workspace functions;
+- domain-specific music/research agents;
+- ScoreSymphony fachliche application integration;
+- final multi-node/VPS placement;
+- final production security/recovery/load/upgrade acceptance.
+
+## 5. Immediate critical path: Integrated Kernel
+
+### IK-1 - Live Forge SSE projection
+
+- connect to Forge live SSE through the public authenticated boundary;
+- parse supported public event shapes;
+- project lifecycle events into canonical V1 events;
+- preserve sequence, correlation and causation semantics;
+- fail explicitly on invalid upstream data.
+
+### IK-2 - Reconnect and historical resynchronization
+
+- recover disconnects through the existing Historical Event Read;
+- handle `events.resync_required`;
+- make catch-up -> live transition gap-free/race-safe;
+- deduplicate overlap without creating a second lifecycle state;
+- advance consumer cursor only after successful processing.
+
+### IK-3 - Forge-owned Shell Worker dispatch
+
+- connect the accepted deterministic shell worker behind Forge task/execution lifecycle;
+- use Forge-created isolated workspace;
+- preserve executable/path policies;
+- return exit state, evidence and changed paths into Forge-owned lifecycle state;
+- cover success, failure, timeout, cancellation and caller-controlled retry.
+
+### IK-4 - Durable command idempotency
+
+- choose a Forge-owned durable deduplication/recovery mechanism;
+- persist enough command identity/correlation state to resolve ambiguous submissions;
+- prove duplicate delivery cannot create a second task/execution lifecycle;
+- define bounded behavior for timeout/network/server ambiguity;
+- prohibit blind retry until the original outcome is resolved.
+
+### IK-5 - Process-level and full E2E acceptance
+
+Automate at least:
+
+1. Hermes produces a valid V1 command.
+2. Hermes-side client/CLI sends through authenticated Gateway.
+3. Gateway validates/authenticates and calls Forge public API.
+4. Forge creates the project-bound task.
+5. Forge starts execution/workspace and dispatches shell worker.
+6. Worker changes only the allowed fixture and returns evidence.
+7. Forge records evidence/tests and applies review/gates.
+8. Failure/review/gate cases remain blocked.
+9. Successful lifecycle terminates deterministically.
+10. Hermes receives validated terminal V1 event(s).
+11. Duplicate command delivery does not create a second lifecycle.
+12. Stale task version is rejected deterministically.
+13. Live-event disconnect recovers historically and resumes without gaps.
+
+Only after these are proven should **Integrated Kernel** be marked complete.
+
+## 6. Parallel work allowed while Integrated Kernel is built
+
+### Security implementation
+
+- bind authenticated principals to V1 `actor` assertions;
+- canonicalize protected operations/digests;
+- add persistent role/policy configuration and role bindings;
+- add persistent approvals and atomic approved -> consumed transition;
+- re-evaluate authorization immediately before protected dispatch;
+- add secret-safe audit events/storage;
+- prove denied/stale/mismatched/expired/consumed/unapproved requests never reach Forge adapter or worker dispatch.
+
+### Repository / CI / deployment hygiene
+
+- keep Python, contract, deployment, Compose and Forge Rust gates required;
+- keep dependency/license/security checks aligned with repository policy;
+- normalize Forge Cargo lock/dependency state before tightening locked checks;
+- keep documentation synchronized with implemented behavior;
+- do not expose gateway publicly before production auth/secret bootstrap exists.
+
+## 7. Release path after Integrated Kernel
+
+1. **Recoverable Runtime** - durable replay/restart/orphan/lease/idempotency and recovery correctness.
+2. **Operable Deployment** - production auth/policy/approvals, reproducible deployment, secrets, backup/restore and operator runbooks.
+3. **Controlled Multi-Agent** - registry, resource admission/scheduling, additional workers and independent review path.
+4. **Extensible Platform** - model/coding adapters, Control Plane, terminal/graph and Component Manager.
+5. **Research / Domain Ready** - research provenance, secure user file/workspace features, domain workers and ScoreSymphony application integration.
+6. **Production Candidate** - final security/recovery/load/agent-safety/upgrade hardening and complete documentation.
+
+Detailed work-package acceptance criteria are maintained in `ROADMAP.md`.
+
+## 8. Clone-ready baseline rules
+
+The new repository should start from a verified snapshot of the **current `main` working tree** and should not import the old `.git` directory.
+
+The fresh baseline must preserve all current source/tests/docs, `LICENSE` and nested upstream license/copyright notices, `UPSTREAMS.yaml`, `THIRD_PARTY_NOTICES.md`, ADR/security/deployment documentation and source-controlled CI workflows.
+
+GitHub-hosted state does not move with the files. Branch protection/rules, required checks, secrets, Actions settings, issues, milestones and other repository settings must be recreated explicitly.
+
+Old issues/PRs/branches remain historical evidence in the archived source repo and should not be copied wholesale into the clean repository.
+
+See `BASELINE_HANDOFF.md` for the exact migration procedure and the proposed fresh issue/milestone structure.
