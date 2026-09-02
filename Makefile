@@ -1,4 +1,4 @@
-.PHONY: validate validate-deployment test quality compose-check check-upstreams
+.PHONY: validate validate-deployment test quality compose-check compose-reference-check reference-preflight check-upstreams
 
 validate:
 	python scripts/validate_baseline.py
@@ -11,6 +11,12 @@ test:
 
 compose-check:
 	docker compose --profile upstream-smoke config --quiet
+
+compose-reference-check:
+	docker compose --profile reference config --quiet
+
+reference-preflight:
+	python scripts/reference_deployment.py preflight
 
 quality: validate validate-deployment test
 
