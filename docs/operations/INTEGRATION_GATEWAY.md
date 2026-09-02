@@ -32,6 +32,24 @@ mean that execution, review, or merge succeeded. A Forge 5xx result is reported
 as `forge.dispatch_uncertain`, because retrying before durable command
 idempotency exists could duplicate an effect.
 
+## Historical Forge recovery dependency
+
+The gateway recovery path depends only on Forge's authenticated public event
+surface. Forge historical mode is selected by supplying `after_sequence` or
+`limit` to `GET /api/v1/events`; parameterless `GET /api/v1/events` remains the
+live SSE stream.
+
+The persisted read contract is complete for the current Integrated Kernel
+scope: `after_sequence` is an exclusive non-negative sequence cursor, `limit`
+defaults to `100` and is bounded to `1..=500`, results are strictly ordered by
+persisted sequence, and empty pages preserve the supplied cursor. Invalid cursor
+or limit values fail deterministically instead of being coerced.
+
+Consumers must advance the durable cursor only after successfully processing a
+validated page. Live reconnect and race-safe catch-up-to-SSE transition remain
+separate Integrated Kernel work; historical recovery itself is no longer a
+blocker.
+
 ## Container image
 
 `Dockerfile.gateway` builds a non-root Python 3.12 image. The image contains no
