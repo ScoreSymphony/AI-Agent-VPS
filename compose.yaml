@@ -52,12 +52,15 @@ services:
       - "${SCORESYMPHONY_BIND_HOST:-127.0.0.1}:${SCORESYMPHONY_GATEWAY_PORT:-8090}:8090"
     environment:
       FORGE_BASE_URL: "http://forge-upstream:8080"
-      FORGE_BEARER_TOKEN: "${FORGE_BEARER_TOKEN:-}"
-      SCORESYMPHONY_GATEWAY_BEARER_TOKEN: "${SCORESYMPHONY_GATEWAY_BEARER_TOKEN:-}"
+      FORGE_BEARER_TOKEN_FILE: "/run/secrets/forge_bearer_token"
+      SCORESYMPHONY_GATEWAY_BEARER_TOKEN_FILE: "/run/secrets/gateway_bearer_token"
       SCORESYMPHONY_GATEWAY_HOST: "0.0.0.0"
       SCORESYMPHONY_GATEWAY_PORT: "8090"
       SCORESYMPHONY_FORGE_TIMEOUT_SECONDS: "${SCORESYMPHONY_FORGE_TIMEOUT_SECONDS:-10}"
       SCORESYMPHONY_EVENT_PAGE_LIMIT: "${SCORESYMPHONY_EVENT_PAGE_LIMIT:-100}"
+    secrets:
+      - forge_bearer_token
+      - gateway_bearer_token
     labels:
       io.scoresymphony.component: gateway
       io.scoresymphony.role: integration-boundary
@@ -108,3 +111,9 @@ services:
 volumes:
   forge-data:
   hermes-data:
+
+secrets:
+  forge_bearer_token:
+    file: "${SCORESYMPHONY_FORGE_TOKEN_FILE:-./.runtime/secrets/forge_bearer_token}"
+  gateway_bearer_token:
+    file: "${SCORESYMPHONY_GATEWAY_TOKEN_FILE:-./.runtime/secrets/gateway_bearer_token}"
