@@ -1,1148 +1,745 @@
-# ScoreSymphony Agent Platform – Roadmap
+# ScoreSymphony Agent Platform - Roadmap
 
-Status: 2026-09-02  
-Repository: `ScoreSymphony/AI-Agent-VPS`  
-Aktueller Hauptstand: PR #4 (`Align V1 integration contract with Forge lifecycle`) ist nach `main` gemergt.
+Updated: **2026-09-02**  
+Repository baseline: `ScoreSymphony/AI-Agent-VPS`  
+Current release gate: **Integrated Kernel**
 
-## Zweck
+## 1. Purpose
 
-Diese Roadmap beschreibt den Weg vom aktuellen, bereits lizenzgeprüften und
-versionierten Monorepo-Kern zu einer produktionsfähigen ScoreSymphony Agent
-Platform. Sie verwendet bewusst kein historisches Phasenmodell. Reihenfolge,
-Parallelisierung und Priorität ergeben sich aus technischen Abhängigkeiten,
-Risiken und überprüfbaren Release-Gates.
+This roadmap describes the path from the current verified ScoreSymphony Agent
+Platform baseline to a Production Candidate. It replaces stale planning language
+that treated Historical Forge Event Recovery or the deterministic Shell Worker
+as future blockers; both are already implemented as accepted building blocks.
 
-Die Roadmap ist **deployment-neutral**. Sie setzt weder eine bestimmte Anzahl
-von VPS noch bestimmte Hostnamen, Anbieter oder Hardware voraus. Eine lokale
-Entwicklungsmaschine, ein einzelner Server, mehrere Server, Remote-Worker oder
-spätere GPU-Knoten sind Deployment-Varianten derselben Plattform und keine
-unterschiedlichen Architekturen.
+There is no historical phase numbering. Priority and order are determined by
+technical dependencies, security boundaries and verifiable release gates.
 
-## Verbindliches Zielbild
+The roadmap is deployment-neutral. Single-node is the reproducible reference
+baseline. Multiple VPS hosts, remote workers, GPU nodes or separate
+monitoring/backup systems are optional deployment profiles selected later from
+measurements and failure-domain requirements.
 
-- **Hermes ist der einzige intelligente Orchestrator.**
-- **Forge ist die deterministische Task-, Execution-, Workspace-, Review-,
-  Gate- und Merge-Authority.**
-- Worker führen begrenzte Aufgaben aus und bauen keine konkurrierende
-  Orchestrierung oder zweite Lifecycle-Wahrheit auf.
-- Die ScoreSymphony-Integrationsschicht verbindet Hermes und Forge nur über
-  versionierte, ScoreSymphony-eigene Verträge und öffentliche Forge-Oberflächen.
-- Die Control Plane zeigt Zustand, Ereignisse, Freigaben, Ressourcen,
-  Komponenten und Workflows, besitzt aber keine zweite Orchestrierungslogik.
-- Der von ScoreSymphony gepflegte Kern bleibt lizenzsauber. Nicht kompatible
-  externe Komponenten werden getrennt installiert und über dokumentierte
-  Prozessgrenzen wie CLI, MCP oder HTTP angebunden.
-- Modellgewichte, Geheimnisse, Laufzeitdaten, Backups und automatisch
-  installierte externe Anwendungen gehören nicht in das Git-Repository.
-- Die Kernplattform darf nicht von einem bestimmten Modellanbieter oder einer
-  kostenpflichtigen API abhängen. Modelle und Coding-Systeme werden über
-  Adapter austauschbar gehalten.
-- Deployment-Topologie ist konfigurierbar: Single-Node ist die reproduzierbare
-  Referenzbasis; Multi-Node und spezialisierte Worker-Knoten sind optionale
-  Erweiterungen nach Messung und Bedarf.
+## 2. Status legend
 
-## Architekturgrenzen
+- **COMPLETE** - acceptance surface required by the current roadmap exists and
+  is verified for its intended scope.
+- **PARTIAL** - meaningful implementation exists, but acceptance criteria remain.
+- **NOT STARTED** - no production-claimable implementation exists yet.
+- **ONGOING** - cross-cutting work that already has a baseline and continues
+  through later release gates.
 
-### Hermes
+A work package being COMPLETE does not imply the entire release gate is complete.
+For example, the Shell Worker acceptance primitive is complete while its
+Forge-owned dispatch integration is still part of the Integrated Kernel.
 
-Hermes plant, priorisiert, zerlegt Aufgaben und entscheidet fachlich, welcher
-Agent beziehungsweise welche Fähigkeit benötigt wird. Hermes besitzt jedoch
-keinen konkurrierenden Forge-Lifecycle-State.
+## 3. Non-negotiable architecture
 
-### Forge
+- **Hermes is the sole intelligent orchestrator.**
+- **Forge is the canonical deterministic lifecycle authority** for projects,
+  tasks, versions, executions, workspaces, worker dispatch, evidence/tests,
+  reviews, gates, merge and durable lifecycle events.
+- ScoreSymphony integrates Hermes and Forge only through versioned
+  ScoreSymphony contracts and verified public Forge interfaces.
+- Workers are bounded executors and do not become orchestrators.
+- Command submission and terminal outcome remain separate concepts.
+- No private Forge database dependency is allowed in Hermes.
+- No second task/execution/review/merge truth is allowed in Gateway, Hermes,
+  workers or the future Control Plane.
+- `actor` is asserted command data, not authentication evidence.
+- Security boundaries are default-deny and high-risk actions require explicit,
+  auditable authorization/approval.
+- The core remains license/provenance clean. Upstream and external components
+  keep their source, version and license identity.
+- The platform must remain usable without introducing additional recurring paid
+  AI/API dependencies as an architectural requirement.
 
-Forge bleibt kanonische Authority für:
+## 4. Current critical path
 
-- Projekte und Tasks,
-- Task-Versionen und Lifecycle-Übergänge,
-- Executions,
-- Workspace-/Worktree-Erzeugung,
-- Worker-/Agent-Dispatch,
-- Tests und Belege,
-- Reviews und Gates,
-- Merge-Entscheidungen,
-- persistente Domain Events und Lifecycle-Audit.
+Historical recovery and Shell Worker acceptance are already available. The
+shortest path to the next release gate is now:
 
-### ScoreSymphony Integration Layer
-
-Die Integrationsschicht:
-
-- validiert V1-Nachrichten,
-- übersetzt Hermes-Intents in öffentliche Forge-Operationen,
-- normalisiert Forge-Ereignisse in stabile V1-Events,
-- übernimmt Transport, Recovery und Adapterlogik,
-- führt aber keinen zweiten Task-, Execution-, Review- oder Merge-State.
-
-### Worker
-
-Worker erhalten begrenzte Aufträge, Tools, Workspaces, Ressourcenbudgets und
-Policies. Sie dürfen Lifecycle-Gates nicht umgehen.
-
-### Control Plane
-
-Die Control Plane ist Operator- und Beobachtungsoberfläche. Sie liest den
-kanonischen Runtime-State und führt autorisierte Aktionen über dieselben
-Verträge aus wie andere Clients.
-
-## Aktueller Stand
-
-### Erledigt
-
-- Zentrales Monorepo festgelegt und Baseline nach `main` gemergt.
-- Forge und Hermes als gepinnte Upstream-Snapshots integriert.
-- Nicht kompatible Hermes-Unterpfade aus dem übernommenen Kern ausgeschlossen
-  und dokumentiert.
-- Rollen von Hermes, Forge, Workern, Integration Layer und Control Plane
-  dokumentiert.
-- V1 Command- und Event-Schemas sowie ausführbare Python-Modelle implementiert.
-- Zentrale Validierung mit strukturierten Rejections implementiert.
-- V1-Daten nach erfolgreicher Validierung rekursiv read-only gemacht.
-- Command-Submission und terminale Ausführungsergebnisse getrennt:
-  `CommandReceipt` beschreibt nur Ingress; terminale Wahrheit kommt über
-  persistente `command.*`-Events.
-- Command-Plane und Read/Event-Plane getrennt.
-- `causation_id` für terminale Command-Events eingeführt.
-- ADR-0001 für lokalen HTTP/JSON-Transport mit Live-SSE-Rückkanal akzeptiert.
-- ADR-0002 akzeptiert und V1 an den verifizierten Forge-Lifecycle angepasst.
-- `create_task` ist explizit projektgebunden (`project_id`).
-- Task-Mutationen tragen erwartete Forge-Versionen für optimistic concurrency.
-- `run_id` wurde vor dem Contract-Freeze durch Forge-konformes `execution_id`
-  ersetzt.
-- V1-Command-Vokabular auf Forge-konforme Lifecycle-Aktionen reduziert:
-  `create_task`, `update_task`, `start_task`, `submit_task`,
-  `request_changes_task`, `approve_task`, `cancel_task`, `retry_execution`,
-  `cancel_execution`.
-- Direkte konkurrierende Commands für Worktree-Erzeugung, Tests, Review,
-  Worker-Dispatch und Merge aus V1 entfernt; diese bleiben Forge-Effekte.
-- Forge-Live-SSE technisch geprüft: `/api/v1/events` ist Broadcast-SSE und
-  signalisiert bei Lag `events.resync_required`, bietet aber selbst keinen
-  historischen Replay.
-- Forge besitzt intern geordnete persistente Domain Events und Cursor-basierte
-  Reads.
-- Contract-Fixtures, Kompatibilitäts-, Semantik-, Negativ- und Timestamp-Tests
-  ergänzt.
-- PR #4 vollständig über CI geprüft; letzter dokumentierter Lauf: 83 Tests grün.
-- Component Registry mit einer deaktivierten `managed_external`-Pilotkomponente
-  angelegt.
-- Baseline-Validierung, Packaging-Checks, Pytest und GitHub Actions vorhanden.
-- Read-only-Upstream-Prüfer für Forge und Hermes vorhanden.
-
-### Aktueller Blocker
-
-Für produktionsfähige Event-Recovery fehlt eine kleine öffentliche,
-authentifizierte und read-only Forge-API zum historischen Lesen persistenter
-Domain Events nach einem Sequence-Cursor.
-
-### Noch nicht umgesetzt
-
-- Öffentlicher historischer Forge-Domain-Event-Read.
-- Laufender ScoreSymphony Command-HTTP-Endpunkt und V1-SSE-Projektion.
-- Forge-Adapter gegen ausschließlich öffentliche Forge-Oberflächen.
-- Hermes-seitige V1-Tools und Event-Integration.
-- Durable Command-Idempotenz über Forge-eigenen State beziehungsweise Events.
-- Deterministischer Shell-Worker-End-to-End-Slice.
-- Vollständige Recovery-, Auth-, Policy- und Approval-Schicht.
-- Reproduzierbares produktionsnahes Deployment.
-- Observability und Runbooks.
-- Agent Registry, Resource Scheduler und unabhängiger Review-Pfad.
-- Modell-/Coding-Adapter.
-- ScoreSymphony Control Plane.
-- Sicherer Component Manager.
-- Research-, Datei-, Infrastruktur- und Fachagenten.
-- ScoreSymphony-Fachanbindung.
-- Optionale Multi-Node-/Remote-Worker-Topologien und deren Ausfalltests.
-
-## Abhängigkeitskette
-
-```mermaid
-flowchart TD
-    B["Baseline + V1 Contract vorhanden"] --> E["Historical Event Recovery API"]
-    E --> A["Forge + Transport Adapter"]
-    A --> H["Hermes Adapter"]
-    H --> K["Integrated Kernel / E2E"]
-    K --> R["Recovery + Security"]
-    R --> D["Reproduzierbares Deployment"]
-    D --> M["Controlled Multi-Agent"]
-    M --> C["Control Plane + Component Manager"]
-    C --> F["Research + Datei + Fachagenten"]
-    F --> T["Optionale Topologie-/Scale-out-Profile"]
-    T --> P["Production Candidate"]
+```text
+Live Forge SSE -> V1
+        |
+Reconnect + historical resync
+        |
+Forge-owned Shell Worker dispatch
+        |
+Durable command idempotency
+        |
+Process-level Hermes -> Gateway -> Forge -> Worker E2E
+        |
+Integrated Kernel release gate
 ```
 
-Spätere Pakete dürfen parallel vorbereitet werden, sobald ihre
-Eingangsvoraussetzungen erfüllt sind. Kein späteres Paket darf die Abnahme eines
-früheren Gates umgehen.
+Security persistence/enforcement and CI/deployment hygiene can proceed in
+parallel where they do not alter the same lifecycle boundary.
 
-# Arbeitspakete bis zur Fertigstellung
+---
 
-## 1. Repository Governance und CI-Härtung
+# Work packages
 
-Priorität: **P0 / laufend**
+## 1. Repository Governance and CI Hardening
 
-### Arbeiten
+**Status: ONGOING**  
+**Priority: P0 / cross-cutting**
 
-- `main` ausschließlich über nachvollziehbare Pull Requests ändern.
-- Pflichtchecks für Baseline-, Contract-, Integrations- und spätere E2E-Tests
-  definieren.
-- PR-Vorlage mit Ziel, Architekturwirkung, Tests, Lizenzwirkung,
-  Sicherheitswirkung, Migration und Rollback pflegen.
-- Issue-Vorlagen für Implementierung, ADR, Upstream-Update und Security pflegen.
-- GitHub-Actions-Abhängigkeiten versionieren und soweit sinnvoll auf Commit-SHAs
-  pinnen.
-- Secret Scanning, Dependency Review und zulässige Lizenzregeln ergänzen, soweit
-  Plattform oder freie Werkzeuge dies erlauben.
+### Already present
 
-### Abnahme
+- architecture-aware PR and issue templates;
+- baseline validation;
+- Python/Pytest and packaging checks;
+- deployment validation;
+- Compose validation;
+- Forge Rust validation;
+- source-controlled workflow configuration;
+- provenance/license tracking for upstream snapshots.
 
-- Ein fehlgeschlagener Pflichtcheck verhindert einen produktiven Merge.
-- Architektur- und Upstream-Änderungen sind über PRs nachvollziehbar.
-- Keine echten Zugangsdaten befinden sich in Git oder CI-Logs.
+### Still required
+
+- recreate branch rules/required checks in the fresh repository;
+- keep dependency, license and secret/security checks aligned with available
+  GitHub/free tooling;
+- normalize Forge Cargo dependency/lock state before tightening locked checks;
+- continuously require factual `CURRENT_STATE.md` / architecture changes when
+  behavior changes.
+
+### Acceptance
+
+Productive changes cannot bypass required checks/review policy; failed required
+checks block merge; no real credentials are committed or leaked by CI.
+
+---
 
 ## 2. Historical Forge Domain Event Read
 
-Priorität: **P0 – unmittelbar als Nächstes**
+**Status: COMPLETE**  
+**Priority: P0 foundation**
 
-### Ziel
+Implemented authenticated read-only access to persisted Forge domain events with
+exclusive `after_sequence` cursor, bounded limit, ordered stable public DTOs,
+invalid-input handling, route tests, generated bindings where required and Rust
+CI coverage. Parameterless Forge live SSE remains unchanged.
 
-Die bereits persistierten Forge-Domain-Events über eine stabile, öffentliche,
-authentifizierte read-only API verfügbar machen, damit ein Adapter nach
-Disconnect oder Lag deterministisch resynchronisieren kann.
+### Acceptance
 
-### Arbeiten
+Met for the current kernel scope. This work package is no longer a blocker.
 
-1. Stabile Query- und Response-Typen definieren.
-2. Cursor-Semantik `after_sequence` festlegen.
-3. Begrenztes `limit` mit sicheren Defaults und Maximalwert definieren.
-4. Authentifizierte read-only Route über `DomainEventRepo` implementieren.
-5. Strikte aufsteigende Reihenfolge garantieren.
-6. Leere Ergebnisse korrekt behandeln.
-7. Ungültige Cursor- und Limit-Werte deterministisch ablehnen.
-8. Bestehendes Live-SSE-Verhalten unverändert lassen.
-9. API-Dokumentation und Changelog aktualisieren.
-10. Falls öffentliche DTOs exportiert werden, generierte Client-Typen
-    aktualisieren.
-
-### Tests
-
-- Auth erfolgreich/fehlgeschlagen.
-- Cursor ab Anfang, Mitte und Ende.
-- Keine Events nach Cursor.
-- Reihenfolge stabil.
-- Limit eingehalten.
-- Invalid Input.
-- Gleichzeitiges Schreiben und Lesen ohne Reihenfolgebruch.
-
-### Abnahme
-
-Ein Client kann nach einer bekannten Sequence alle danach persistierten Events
-in stabiler Reihenfolge lesen, ohne direkt auf Forge-Datenbankinternas
-zuzugreifen.
+---
 
 ## 3. Forge Adapter
 
-Priorität: **P0**
+**Status: PARTIAL / ADVANCED**  
+**Priority: P0**
 
-### Arbeiten
+### Already present
 
-- Jedes V1-Command ausschließlich auf öffentliche, stabile Forge-Operationen
-  abbilden.
-- `project_id`, `task_id`, `execution_id`, Task-Version und `correlation_id`
-  korrekt weiterreichen beziehungsweise normalisieren.
-- Optimistic-Concurrency-Konflikte als deterministische V1-Rejections
-  projizieren.
-- Duplicate Commands erkennen, ohne einen zweiten unkontrollierten Lifecycle
-  auszulösen.
-- Forge Task-, Workspace-, Execution-, Review- und Merge-Events in V1-Events
-  normalisieren.
-- Terminale Command-Events mit korrekter `causation_id` erzeugen.
-- Keine Forge-DB-Modelle oder privaten Interna in Hermes importieren.
+- all current V1 commands map to verified public Forge HTTP operations;
+- `project_id`, `task_id`, `execution_id` and task versions are carried through;
+- historical Forge event pages are validated and supported lifecycle events are
+  projected into canonical V1 event shapes;
+- private Forge database/services are not imported into Hermes;
+- command transport uses authenticated public Forge boundaries.
 
-### Abnahme
+### Still required
 
-- V1-Commands verändern Forge ausschließlich über öffentliche Interfaces.
-- Forge bleibt einzige Lifecycle-Authority.
-- Fehler, Rejections und terminale Ergebnisse sind eindeutig unterscheidbar.
+- finish live-event normalization path;
+- prove deterministic duplicate handling through durable Forge-owned idempotency;
+- ensure every public Forge rejection/concurrency failure is projected with
+  stable ScoreSymphony failure semantics;
+- integrate worker dispatch only behind Forge-owned lifecycle.
+
+### Acceptance
+
+Every V1 command/event needed by the Integrated Kernel is covered by public
+Forge interfaces, duplicate/ambiguous delivery cannot create a second lifecycle,
+and no private Forge internals leak into Hermes.
+
+---
 
 ## 4. ScoreSymphony HTTP/SSE Transport Runtime
 
-Priorität: **P0**
+**Status: PARTIAL / ADVANCED**  
+**Priority: P0 - immediate critical path**
 
-### Command-Pfad
+### Already present
 
-```text
-Hermes -> HTTP/JSON -> V1 Validation -> Forge Adapter -> Forge
-```
+- authenticated ScoreSymphony Gateway;
+- HTTP/JSON command ingress;
+- command validation and `CommandReceipt` behavior;
+- authenticated historical event recovery;
+- health/readiness separation;
+- request bounds and fail-closed upstream validation;
+- authenticated Forge transport.
 
-### Event-Pfad
+### Still required
 
-```text
-Forge durable events + live SSE -> V1 projection -> SSE -> Hermes
-```
+- live Forge SSE consumption;
+- V1 projection of supported live lifecycle events;
+- disconnect handling;
+- `events.resync_required` handling;
+- race-safe historical catch-up -> live transition;
+- overlap deduplication without second lifecycle state;
+- cursor advancement only after successful processing;
+- bounded buffers/backpressure/timeouts.
 
-### Arbeiten
+### Acceptance
 
-- Command-HTTP-Endpunkt zunächst auf Loopback bereitstellen.
-- V1-Schema- und Semantikvalidierung vor Dispatch erzwingen.
-- `CommandReceipt` für accepted, duplicate und pre-dispatch rejected liefern.
-- Live-SSE anbinden.
-- Reconnect und Cursor-Wiederaufnahme implementieren.
-- Historical Event Read zum Schließen von Event-Lücken verwenden.
-- Übergang von historischem Catch-up zu Live-SSE race-sicher machen.
-- Backpressure, Disconnects, Timeouts und begrenzte Puffer definieren.
-- Fehler niemals als erfolgreiche Ausführung maskieren.
+A live connection may fail at arbitrary points and recover through historical
+reads without silent gaps, incorrect cursor advancement or duplicate lifecycle
+state.
 
-### Tests
+---
 
-- gültiger Command,
-- malformed Input,
-- unbekannte Schema-Version,
-- Duplicate,
-- stale Task-Version,
-- Forge-Rejection,
-- Forge-Execution-Fehler,
-- SSE Disconnect,
-- Replay nach Lag,
-- Event-Lücke,
-- Reconnect,
-- Prozessrestart.
+## 5. Hermes Adapter and ScoreSymphony Tools
 
-## 5. Hermes Adapter und ScoreSymphony Tools
+**Status: PARTIAL / ADVANCED**  
+**Priority: P0**
 
-Priorität: **P0**
+### Already present
 
-### Arbeiten
-
-Hermes-seitige Werkzeuge für das korrigierte V1-Vokabular bereitstellen:
+- authenticated Hermes-side Gateway client;
+- `scoresymphony-hermes` CLI;
+- current V1 command serialization;
+- historical event read/validation;
+- in-process Hermes -> Gateway -> Forge integration acceptance.
 
-- `create_task`,
-- `update_task`,
-- `start_task`,
-- `submit_task`,
-- `request_changes_task`,
-- `approve_task`,
-- `cancel_task`,
-- `retry_execution`,
-- `cancel_execution`,
-- getrennte Status-/Event-Reads.
+### Still required
 
-Hermes-Pläne werden in gültige V1-Commands übersetzt. V1-Events und terminale
-Ergebnisse fließen in den Hermes-Kontext zurück.
+- consume terminal/live V1 event flow in the process-level path;
+- process-level CLI -> Gateway -> Forge acceptance;
+- verify correlation/causation preservation end to end;
+- optionally add service-gated permanent Hermes tool registration only if CLI
+  ergonomics prove insufficient.
 
-### Verbotene Doppelzuständigkeiten
+### Acceptance
 
-Hermes baut keine eigene Implementierung für:
+Hermes can plan and submit through V1, observe terminal lifecycle truth, and
+never gains its own workspace/test/review/merge authority.
 
-- Workspace-/Worktree-Lifecycle,
-- Test-Gates,
-- Review-Gates,
-- Worker-Dispatch-State,
-- Merge-State,
-- Execution-Authority.
+---
 
-### Abnahme
+## 6. Deterministic Shell Worker
 
-Hermes kann den vollständigen Lifecycle fachlich steuern, ohne Forge-Interna zu
-kennen oder Forge-State zu duplizieren.
+**Status: COMPLETE AS REFERENCE WORKER**  
+**Priority: P0 foundation**
 
-## 6. Deterministischer Shell-Worker
+Implemented executable allowlisting, workspace confinement, deterministic
+environment/results, timeout, non-zero failure, cooperative cancellation,
+caller-controlled retries, POSIX descendant termination, declared write-path
+policy and deterministic changed-path evidence including file-mode changes.
 
-Priorität: **P0**
+### Important boundary
 
-### Arbeiten
+Completion here means the worker primitive is accepted. Forge-owned dispatch
+wiring is still part of Work Package 7 / Integrated Kernel.
 
-- Kleinen Referenz-Worker implementieren.
-- Ausschließlich ein Fixture-/Testrepository bearbeiten.
-- Von Forge bereitgestellten isolierten Workspace verwenden.
-- Vorhersehbare Dateiänderung ausführen.
-- Nur erlaubte Pfade verändern.
-- Belege und Exit-Status zurückgeben.
-- Erfolgs-, Fehler-, Timeout-, Cancel- und Retry-Fälle unterstützen.
+---
 
-### Zweck
+## 7. Integrated Kernel - Full End-to-End Slice
 
-Der Shell-Worker beweist die Runtime-Architektur ohne zusätzliche Unsicherheit
-durch ein LLM oder externes Coding-System.
+**Status: PARTIAL - CURRENT RELEASE GATE**  
+**Priority: P0**
 
-## 7. Integrated Kernel – vollständiger End-to-End-Slice
+### Already present
 
-Priorität: **P0 Release-Gate**
-
-Der Kernel gilt erst als integriert, wenn CI automatisch beweist:
+- V1 contracts;
+- authenticated command Gateway;
+- public Forge command mapping;
+- historical recovery;
+- Hermes client/CLI;
+- deterministic Shell Worker;
+- in-process integration acceptance;
+- Security Contract foundation.
 
-1. Hermes erzeugt einen gültigen V1-Task-Intent.
-2. Die Integration validiert und übermittelt ihn.
-3. Forge erstellt den projektgebundenen Task.
-4. Forge startet eine Execution und erzeugt den isolierten Workspace.
-5. Der Shell-Worker ändert ausschließlich die erlaubte Fixture.
-6. Tests und Belege werden Forge-seitig gespeichert.
-7. Review- und Gate-Fehler verhindern eine Freigabe beziehungsweise Merge.
-8. Ein erfolgreicher Lifecycle darf kontrolliert abgeschlossen werden.
-9. Das terminale Ergebnis erreicht Hermes als versioniertes Event.
-10. Duplicate Delivery erzeugt keinen zweiten unkontrollierten Lifecycle.
-11. Stale Task-Versionen werden deterministisch abgelehnt.
-12. Eine unterbrochene Event-Verbindung kann über Historical Read + SSE wieder
-    synchronisiert werden.
+### Required to close the gate
 
-**Release-Gate: Integrated Kernel**
+1. Hermes produces a valid V1 task intent.
+2. Authenticated Gateway accepts/validates the command.
+3. Forge creates the project-bound task.
+4. Forge starts execution and isolated workspace.
+5. Forge dispatches the bounded Shell Worker.
+6. Worker changes only the allowed fixture and returns evidence.
+7. Forge stores test/evidence state and applies review/gates.
+8. Failed review/gates block completion/merge.
+9. Successful lifecycle reaches controlled terminal state.
+10. Terminal outcome reaches Hermes as validated V1 event.
+11. Duplicate command delivery creates no second lifecycle.
+12. Stale task version is deterministically rejected.
+13. Live event disconnect recovers via Historical Read and resumes without gaps.
 
-## 8. Zuverlässigkeit, Persistenz und Recovery
+### Immediate sub-work
+
+- **IK-1:** Live Forge SSE -> V1 projection.
+- **IK-2:** reconnect/resync + cursor-safe catch-up/live transition.
+- **IK-3:** Forge-owned Shell Worker dispatch.
+- **IK-4:** durable command idempotency / ambiguous-submission recovery.
+- **IK-5:** process-level/full E2E acceptance suite.
 
-Priorität: **P0 nach Integrated Kernel**
+---
 
-### Arbeiten
-
-- Kanonische Zuständigkeiten für Task-, Execution-, Workspace-, Review- und
-  Orchestrierungszustand im Code erzwingen.
-- Persistente Zuordnung zwischen Hermes-Intent/Correlation und Forge-Objekten
-  sicherstellen.
-- Durable Command-Idempotenz integrieren.
-- Event-Reihenfolge, Replay, Cursor und Dead-Letter-Verhalten definieren.
-- Abgelaufene Leases erkennen.
-- Abgestürzte Worker und halbfertige Executions erkennen.
-- Verwaiste Workspaces sicher behandeln.
-- Kontrollierte Wiederaufnahme nach Prozess- oder Host-Neustart implementieren.
-- Retry-Budgets und begrenzte Review-/Repair-Schleifen definieren.
-- Minimalen Plattformzustand sichern und wiederherstellen können.
+## 8. Reliability, Persistence and Recovery
 
-### Abnahme
+**Status: PARTIAL / EARLY**  
+**Priority: P0 after Integrated Kernel**
 
-- Ein Restart verliert keinen bestätigten Task.
-- Ein Restart startet keinen abgeschlossenen oder bereits laufenden Task doppelt.
-- Event-Replay erzeugt denselben nachvollziehbaren Zustand.
-- Unauflösbare Inkonsistenzen schlagen geschlossen und sichtbar fehl.
-- Alle relevanten Zustandsänderungen besitzen eine Audit-Spur.
+### Foundation already present
 
-**Release-Gate: Recoverable Runtime**
+- durable Forge domain events;
+- authenticated historical event recovery;
+- explicit command/correlation/causation concepts;
+- bounded worker timeout/cancellation behavior.
 
-## 9. Security-, Policy- und Approval-Schicht
+### Still required
 
-Priorität: **P0 vor externer Erreichbarkeit**
+- durable command idempotency and Hermes-intent/Forge-object correlation;
+- restart-safe command/result recovery;
+- event replay invariants and cursor persistence;
+- expired lease detection;
+- crashed worker / half-finished execution detection;
+- orphaned workspace policy;
+- retry budgets;
+- bounded repair loops;
+- minimal platform backup/restore state;
+- fail-closed inconsistency handling.
 
-### Identitäten und Rollen
+### Acceptance / Release gate: Recoverable Runtime
 
-Mindestens:
+Restarts lose no confirmed task, do not duplicate completed/running work, replay
+reconstructs the same auditable state, and unresolved inconsistency fails closed
+and visibly.
 
-- Operator,
-- Orchestrator,
-- Worker,
-- Reviewer,
-- Read-only Observer,
-- interne Service-Identitäten.
+---
 
-### Policies
+## 9. Security, Policy and Approval Layer
 
-Zentral erzwingen:
+**Status: PARTIAL - CONTRACT FOUNDATION COMPLETE**  
+**Priority: P0 before external/production exposure**
 
-- erlaubte Workspace-Wurzeln,
-- Dateipfade,
-- Tool-Nutzung,
-- Shell-Commands,
-- Netzwerk/Egress,
-- Ressourcenbudgets,
-- Parallelität,
-- Secrets,
-- Deployment- und Infrastrukturaktionen.
+### Already present
 
-### Menschliche Freigaben
+- principal/credential/resource/scope contracts;
+- authorization requests/decisions;
+- default-deny reference semantics;
+- `DENY > REQUIRE_APPROVAL > ALLOW` precedence;
+- exact operation/policy binding;
+- approval expiry, no-self-approval default and consumed state.
 
-Explizite Approvals für risikoreiche Aktionen wie:
+### Still required
 
-- produktiver Merge,
-- Deployment,
-- destruktive Löschungen,
-- Komponenteninstallation oder -update,
-- sensible Server-/Hostaktionen,
-- Rechteerweiterung.
+- bind authenticated principal to V1 `actor` assertion;
+- persistent roles/policies/bindings;
+- persistent approvals with atomic consumption;
+- re-authorization before dispatch;
+- secret-safe persistent security audit;
+- policy enforcement at command ingress and worker dispatch;
+- production credential provisioning/rotation;
+- Forge auth bootstrap and secret injection;
+- egress, path, command, resource and privilege-escalation enforcement tests.
 
-### Sicherheitsgrenzen
+### Acceptance
 
-Normale Worker erhalten keinen unbeschränkten:
+Unauthorized commands/paths/tools/egress/privilege changes never reach protected
+Forge/worker actions, and approvals cannot be replayed or used for a different
+operation.
 
-- Root-/Sudo-Zugriff,
-- Docker-Socket,
-- SSH-Zugriff,
-- Firewall-Zugriff,
-- Host-/Cloud-Control-Zugriff,
-- Production-Secret-Zugriff.
+---
 
-### Abnahme
+## 10. Reproducible Reference Deployment
 
-Nicht autorisierte Aktionen, Pfade und Commands werden getestet abgewiesen und
-kein Worker kann Forge-Gates oder Approvals umgehen.
+**Status: PARTIAL**  
+**Priority: P1 after security bootstrap is defined**
 
-## 10. Reproduzierbares Referenz-Deployment
+### Already present
 
-Priorität: **P1**
+- deployment/Compose validation foundation;
+- persistent Forge data baseline;
+- health/liveness basics;
+- bounded logging/restart configuration baseline;
+- non-root Gateway image;
+- runtime configuration contract.
 
-Die Referenz ist zunächst ein einzelner unterstützter Host beziehungsweise eine
-Single-Node-Installation. Das ist eine Reproduzierbarkeitsbasis, keine
-Vorgabe für spätere Produktionsgrößen.
+### Still required
 
-### Arbeiten
+- production Gateway Compose wiring;
+- reproducible Forge auth bootstrap and secret injection;
+- complete readiness/dependency checks;
+- migrations/upgrade/rollback procedure;
+- backup/restore;
+- resource limits and permissions review;
+- reverse proxy/TLS only after production auth baseline;
+- operator start/stop/update/diagnosis/recovery runbook.
 
-- reproduzierbares Compose-/Deployment-Profil,
-- Health-, Readiness- und Dependency-Checks,
-- persistente Volumes,
-- Verzeichnisrechte,
-- Ressourcenlimits,
-- Restart Policies,
-- Log Rotation,
-- Bootstrap,
-- Migrationen,
-- Upgrade,
-- Rollback,
-- Backup und Restore,
-- Reverse Proxy und TLS nach abgeschlossener Auth-/Security-Grundlage,
-- Betriebsanleitung für Start, Stop, Update, Diagnose und Recovery.
+### Acceptance / Release gate: Operable Deployment
 
-### Abnahme
+A fresh supported host can start the platform reproducibly and run the complete
+Integrated Kernel without manual source edits.
 
-Eine frische unterstützte Maschine kann die Plattform ohne manuelle
-Codeänderungen reproduzierbar starten und den vollständigen E2E-Slice ausführen.
+---
 
-**Release-Gate: Operable Deployment**
+## 11. Observability and Operations
 
-## 11. Observability und Betrieb
+**Status: PARTIAL / BASELINE**  
+**Priority: P1 continuous**
 
-Priorität: **P1, ab Referenz-Deployment kontinuierlich ausbauen**
+Required correlation dimensions include `correlation_id`, `command_id`,
+`task_id`, `execution_id`, worker/agent identity and relevant event sequence.
 
-### Gemeinsame Identitäten
+Still required: lifecycle latency/error/retry/queue metrics, CPU/RAM/I/O/storage
+and worker utilization, replay/recovery diagnostics, actionable alerts for
+service failure, blocked queues, orphaned leases, backup failure and unusual
+resource pressure.
 
-Logs, Events, Metriken und Traces müssen soweit anwendbar über gemeinsame IDs
-korrelierbar sein:
+### Acceptance
 
-- `correlation_id`,
-- `command_id`,
-- `task_id`,
-- `execution_id`,
-- Agent-/Worker-ID.
+A failed lifecycle can be reconstructed from logs/events/metrics and alerts state
+an actionable operator response.
 
-### Metriken
-
-Mindestens erfassen:
-
-- Laufzeit,
-- Fehlerquote,
-- Retries,
-- Queue-Wartezeit,
-- CPU,
-- RAM,
-- I/O,
-- Speicher,
-- Netzwerk,
-- Worker-Auslastung,
-- Modellnutzung soweit lokal messbar.
-
-### Alerts
-
-Warnungen für:
-
-- ausgefallene Dienste,
-- blockierte Queues,
-- verwaiste Leases,
-- fehlgeschlagene Backups,
-- ungewöhnliche Ressourcenlast,
-- Event-Recovery-Fehler.
-
-Externe Monitoring-Komponenten werden nur angebunden, wenn sie einen klaren
-Mehrwert gegenüber der eigenen Telemetrie liefern.
-
-### Abnahme
-
-Ein fehlerhafter Lifecycle ist über gemeinsame IDs vollständig nachvollziehbar
-und Alerts nennen eine konkrete Operator-Handlung.
+---
 
 ## 12. Agent Registry
 
-Priorität: **P1**
+**Status: NOT STARTED**  
+**Priority: P1**
 
-### Agentenmanifest
+Versioned agent manifest covering identity/type, capabilities, tools,
+model/backend, resource requirements, security profile, health, version and
+allowed task classes.
 
-Einheitliches Manifest für:
+### Acceptance
 
-- Agent-ID und Typ,
-- Fähigkeiten,
-- Tools,
-- Modell/Backend,
-- Ressourcenbedarf,
-- Sicherheitsprofil,
-- Health Check,
-- Version,
-- erlaubte Task-Klassen.
+Agents can be registered, validated, enabled and disabled without changing core
+platform contracts.
 
-### Abnahme
+---
 
-Agenten können registriert, geprüft, aktiviert und deaktiviert werden, ohne die
-Plattformverträge zu verändern.
+## 13. Resource Scheduler and Capacity Control
 
-## 13. Resource Scheduler und Capacity Control
+**Status: NOT STARTED**  
+**Priority: P1**
 
-Priorität: **P1**
+Deterministically check CPU, RAM, storage, concurrency, workspace capacity,
+model/backend limits and policy before worker start. Hermes selects capability;
+runtime controls admissibility and start timing.
 
-### Arbeiten
+### Acceptance
 
-Vor dem Worker-Start deterministisch prüfen:
+Over-capacity or policy-forbidden work is delayed/rejected before execution and
+cannot bypass resource limits.
 
-- verfügbare CPU,
-- RAM,
-- Speicher,
-- Parallelitätsgrenzen,
-- Agent-/Modell-Limits,
-- Workspace-Kapazität,
-- Policy-Zulassung.
+---
 
-Hermes entscheidet fachlich, welche Fähigkeit benötigt wird. Die Runtime
-entscheidet deterministisch, ob und wann die Ausführung zugelassen werden kann.
+## 14. Worker Families
 
-## 14. Worker-Familien
+**Status: NOT STARTED BEYOND SHELL REFERENCE**  
+**Priority: P1/P2 incremental**
 
-Priorität: **P1/P2, schrittweise**
+Candidate worker classes: Coding, Research, File, Infrastructure/Server,
+Monitoring, Deployment, Review and domain-specific music/research workers.
 
-Nach dem Shell-Worker können kontrolliert ergänzt werden:
+Each worker receives minimum rights, explicit tools and a resource/security
+profile.
 
-- Coding Worker,
-- Research Worker,
-- File Worker,
-- Infrastructure/Server Worker,
-- Monitoring Worker,
-- Deployment Worker,
-- Review Worker,
-- domänenspezifische Worker.
+---
 
-Jeder Worker erhält minimale Rechte und ein eigenes Ressourcenprofil.
+## 15. Independent Review Path
 
-## 15. Unabhängiger Review-Pfad
+**Status: NOT STARTED**  
+**Priority: P1**
 
-Priorität: **P1**
+Separate reviewer should be read-only by default, inspect evidence/diffs/tests
+and policy violations, support bounded repair cycles, and feed its result into
+Forge gates without gaining uncontrolled merge/privilege authority.
 
-### Arbeiten
+Forge's existing review lifecycle is an authority foundation, not by itself the
+complete independent ScoreSymphony reviewer implementation.
 
-- separaten Reviewer standardmäßig read-only betreiben,
-- Belege, Diffs, Tests und Policy-Verstöße prüfen,
-- begrenzte Repair-/Nachbesserungsschleifen erlauben,
-- Reviewer darf nicht selbst unkontrolliert mergen oder Rechte erweitern,
-- Review-Resultat als Forge-Gate verwenden.
+---
 
-**Release-Gate: Controlled Multi-Agent**
+## 16. Model and Coding Adapter Layer
 
-Erreicht, wenn mehrere Agenten/Worker kontrolliert parallel arbeiten können,
-Ressourcenlimits vor Start greifen und unabhängige Reviews/Approvals vorhanden
-sind.
+**Status: NOT STARTED AS GENERAL LAYER**  
+**Priority: P1**
 
-## 16. Modell- und Coding-Adapter
+Keep coding/model backends interchangeable without changing V1 or Forge
+lifecycle semantics. Intended classes include local models, OpenAI-compatible
+local endpoints, external coding CLIs, Codex/FCC where technically and
+license-compatible, Qwen workers and future compatible backends.
 
-Priorität: **P1**
+No backend may become a second orchestrator or introduce a mandatory recurring
+paid API dependency into the platform architecture.
 
-### Ziel
+---
 
-Coding- und Modellbackends austauschbar halten.
+## 17. ScoreSymphony Control Plane - MVP
 
-Mögliche Adapterklassen:
+**Status: NOT STARTED**  
+**Priority: P1 after stable runtime**
 
-- lokal laufende Modelle,
-- OpenAI-kompatible lokale Endpunkte,
-- externe Coding-CLIs,
-- Codex-/FCC-Integration soweit technisch und lizenzseitig zulässig,
-- Qwen-basierte Coding-Worker,
-- weitere kompatible Backends.
+Required views eventually include platform/blockers, projects/tasks/executions,
+workspaces, events/audit, tests/reviews/gates/approvals, agents/models/tools,
+resources/queues, components, health and settings/policies.
 
-### Abnahme
+### Rules
 
-Ein Modell- oder Backendwechsel verändert weder V1-Verträge noch Forge-
-Lifecycle-Semantik.
+UI reads canonical runtime state, creates no second lifecycle database, shows
+explicit approvals for risky actions, and every mutation remains authorized and
+auditable.
 
-## 17. ScoreSymphony Control Plane – Grundversion
+---
 
-Priorität: **P1 nach stabiler Runtime**
+## 18. Multi-Agent Terminal and Workflow Graph
 
-### Ansichten
+**Status: NOT STARTED**  
+**Priority: P1/P2 after Control Plane foundation**
 
-- Plattformstatus und Blocker,
-- Projekte und Tasks,
-- Executions,
-- Workspaces,
-- Events und Audit-Timeline,
-- Tests,
-- Reviews,
-- Gates und Approvals,
-- Agent Registry,
-- Modelle und Tools,
-- Ressourcen und Queues,
-- Komponenten und Updates,
-- Health Checks,
-- Einstellungen und Policies.
+- terminal surface such as xterm.js with strict session/agent rights;
+- explicit session-to-agent mapping;
+- no implicit privilege expansion;
+- workflow graph such as React Flow/xyflow using actual runtime
+  task/execution/review/approval relations rather than a parallel workflow state.
 
-### Regeln
-
-- UI liest ausschließlich kanonischen Runtime-State.
-- UI erfindet keinen zweiten Task-/Execution-State.
-- Riskante Aktionen zeigen explizite Approvals.
-- Jeder UI-Befehl ist autorisiert und auditierbar.
-
-## 18. Multi-Agent-Terminal und Workflow-Graph
-
-Priorität: **P1/P2 nach Control-Plane-Grundversion**
-
-### Multi-Agent-Terminal
-
-- `xterm.js` oder vergleichbare Terminaloberfläche,
-- strikt getrennte Sitzungsrechte,
-- Session-/Agent-Zuordnung,
-- keine implizite Rechteerweiterung.
-
-### Workflow-Graph
-
-- React Flow/xyflow oder vergleichbare Darstellung,
-- Task-, Execution-, Review- und Approval-Kanten visualisieren,
-- tatsächlichen Runtime-State darstellen statt einen zweiten Workflow-State zu
-  führen.
+---
 
 ## 19. Component Manager
 
-Priorität: **P1 nach Security + Agent Registry**
+**Status: NOT STARTED**  
+**Priority: P1 after security + Agent Registry**
 
-### Komponentenklassen
+Component classes: `core`, `vendored`, `managed_external`, `remote_external`.
 
-- `core`,
-- `vendored`,
-- `managed_external`,
-- `remote_external`.
+Required lifecycle: source/version/checksum/license metadata, install, health,
+update, rollback, removal, operator approval and failure isolation from core.
 
-### Funktionen
+### Pilot acceptance
 
-- deklarierte Originalquelle,
-- Version-Pin,
-- Prüfsumme,
-- Lizenzanzeige,
-- Installation,
-- Health Check,
-- Update,
-- Rollback,
-- Entfernung,
-- Operator-Freigabe.
+At least one managed-external coding/model component can be installed, checked,
+updated, rolled back and removed without corrupting the core.
 
-### Anforderungen
-
-- Nicht kompatibler Fremdcode wird nicht in den Kern kopiert.
-- Fehlgeschlagene Installer dürfen den Core nicht beschädigen.
-- Herkunft, Version, Lizenz und Integrationsgrenze sind sichtbar.
-
-### Pilot
-
-Eine kontrollierte externe Coding-/Modellkomponente wird als erster
-`managed_external`-Pilot genutzt. Konkrete Produktwahl bleibt austauschbar und
-ist keine Kernarchitektur-Annahme.
-
-**Release-Gate: Extensible Platform**
-
-Erreicht, wenn Control Plane und sicherer Component Manager funktionsfähig sind
-und mindestens eine externe Pilotkomponente vollständig installiert,
-aktualisiert, zurückgerollt und entfernt werden kann.
+---
 
 ## 20. Research Broker
 
-Priorität: **P2 nach stabiler Plattform**
+**Status: NOT STARTED**  
+**Priority: P2 after stable platform**
 
-### Ziel
+Provider-adapter research layer for sources such as GitHub, arXiv, Crossref,
+OpenAlex, Semantic Scholar, IMSLP and MusicBrainz.
 
-Schlanke, reproduzierbare Recherche-Infrastruktur statt eines hart eingebauten
-Suchmaschinen-Forks.
+Results should preserve provider/source URL, title/authors/identifier,
+retrieval time, query/research run, agent, evidence reference and review status
+where available.
 
-### Erste Providerklassen
+### Acceptance
 
-- GitHub,
-- arXiv,
-- Crossref,
-- OpenAlex,
-- Semantic Scholar,
-- IMSLP,
-- MusicBrainz,
-- weitere domänenspezifische Quellen über Adapter.
+Research runs are reproducible and provenance-aware; unreviewed claims are not
+silently promoted into verified domain data.
 
-### Provenienz
+---
 
-Jedes Research-Ergebnis soll soweit verfügbar speichern:
+## 21. Secure File and Workspace Functions
 
-- Quelle/URL,
-- Provider,
-- Titel,
-- Autoren,
-- Identifier,
-- Abrufzeit,
-- Query,
-- Research-Run,
-- Agent,
-- Zitat-/Belegreferenz,
-- Review-/Freigabestatus.
+**Status: NOT STARTED AS USER-FACING PLATFORM FEATURE**  
+**Priority: P2**
 
-### Abnahme
+Forge workspace lifecycle already exists, but this package refers to safe
+platform/user file functions: constrained roots, upload/download, preview, diff,
+versions, export, approvals and separation between user files and agent
+workspaces. Large/binary files should remain outside Git.
 
-Research-Runs sind reproduzierbar, Quellen nachvollziehbar und Ergebnisse
-können nicht ohne Provenienz in geprüfte Wissensbestände übernommen werden.
+---
 
-## 21. Datei- und Workspace-Funktionen
+## 22. Domain-Specific Workers
 
-Priorität: **P2**
+**Status: NOT STARTED**  
+**Priority: P2**
 
-### Arbeiten
+Planned classes include Music Analysis, Corpus, Metadata, Source and Music
+Research workers for harmony, cadence, form, counterpoint, motif, key, corpus
+comparison, source research and metadata workflows.
 
-- sichere Workspace-Wurzeln,
-- Upload und Download,
-- Vorschau,
-- Diff,
-- Dateiversionen,
-- Export,
-- Freigaben,
-- klare Trennung von Nutzerdateien und Agentenarbeitsbereichen,
-- große/binäre Dateien außerhalb von Git verwalten,
-- optionalen Dateidienst nur als getrennte Komponente anbinden.
+Verified domain data must not be overwritten without provenance/review policy.
 
-## 22. Domänenspezifische Fachagenten
+---
 
-Priorität: **P2**
+## 23. ScoreSymphony Application Integration
 
-Die Plattform muss Fachagenten über dieselben Worker-/Policy-/Review-Grenzen
-integrieren können. Für ScoreSymphony sind insbesondere vorgesehen:
+**Status: NOT STARTED**  
+**Priority: P2**
 
-- Music Analysis Worker,
-- Corpus Worker,
-- Metadata Worker,
-- Source Worker,
-- Music Research Worker.
+Connect the ScoreSymphony music application through versioned APIs/jobs rather
+than primary direct database coupling. Agent-generated domain information must
+preserve provenance and explicit proposal/review/verified state.
 
-Mögliche Aufgaben umfassen Harmonie, Kadenz, Form, Kontrapunkt, Motivik,
-Tonarten, Korpusvergleich, Quellenrecherche und Metadatenpflege.
+### Release gate: Research / Domain Ready
 
-Geprüfte Fachdaten dürfen nicht ohne Provenienz und Freigabe überschrieben
-werden.
+Reached when provenance-aware research, secure file/workspace features and at
+least one useful domain worker operate end to end through the platform.
 
-## 23. Anbindung der ScoreSymphony-Fachanwendung
+---
 
-Priorität: **P2**
+## 24. Optional Deployment Topologies and Scale-Out
 
-Die Agent Platform bleibt vom eigentlichen musikwissenschaftlichen
-Anwendungskern getrennt.
+**Status: NOT STARTED / OPTIONAL**  
+**Priority: P2 after stable reference deployment**
 
-```text
-ScoreSymphony Application
-        |
-versionierte API / Jobs
-        |
-ScoreSymphony Agent Platform
-        |
-      Hermes
-        |
-      Worker
-```
+Possible profiles: local development, single node, multi-node, separate worker,
+monitoring/backup/staging host, remote worker, specialized CPU/RAM/GPU node.
 
-### Anforderungen
+Before splitting, measure CPU, RAM, storage, I/O, network, queue latency, worker
+throughput and failure impact.
 
-- versionierte APIs oder Jobs,
-- keine direkte Datenbankkopplung als primäre Integrationsgrenze,
-- Provenienz und Review für agentisch erzeugte Fachinformationen,
-- klare Trennung zwischen Vorschlag, Analyse und geprüftem Fachdatenstand.
+Any selected profile must preserve one canonical lifecycle authority,
+authenticated minimal networking, defined failure domains and no split-brain.
 
-**Release-Gate: Research / Domain Ready**
-
-Erreicht, wenn Research-Provenienz, sichere Dateien/Workspaces und mindestens
-ein sinnvoller Fachworker vollständig über die Plattform laufen.
-
-## 24. Optionale Deployment-Topologien und Scale-out
-
-Priorität: **P2 / optional nach stabilem Referenz-Deployment**
-
-Dieser Block ist **kein Zwang zu zwei VPS oder zwei Hosts**. Er beschreibt die
-allgemeine Fähigkeit, die Plattform bei Bedarf zu verteilen.
-
-### Mögliche Profile
-
-- lokale Entwicklung,
-- Single-Node-Server,
-- Multi-Node-Deployment,
-- separater Worker-Host,
-- separater Monitoring-/Backup-/Staging-Host,
-- Remote-Worker,
-- spezialisierter CPU-, RAM- oder GPU-Knoten.
-
-### Vor einer Aufteilung messen
-
-- CPU,
-- RAM,
-- Speicher,
-- I/O,
-- Netzwerk,
-- Queue-Latenz,
-- Worker-Durchsatz,
-- Ausfallauswirkungen.
-
-### Regeln
-
-- nur eine kanonische Task-/Execution-Wahrheit,
-- kein zweiter Orchestrator,
-- keine duplizierte Review-/Merge-Authority,
-- private beziehungsweise authentifizierte Dienstkommunikation,
-- minimale Netzwerkfreigaben,
-- definierte Failure Domains.
-
-### Abnahme für ein gewähltes Multi-Node-Profil
-
-- messbarer Vorteil gegenüber der einfacheren Topologie,
-- getestetes Verhalten beim Ausfall einzelner Knoten,
-- Backup/Restore und Netzwerkgrenzen geprüft,
-- keine State-Split-Brain-Situation.
-
-Ein Multi-Node-Profil ist nicht erforderlich, wenn die Zielinstallation als
-Single Node alle funktionalen, Sicherheits- und Lastanforderungen erfüllt.
+---
 
 ## 25. Production Hardening
 
-Priorität: **P0/P1 vor Production Candidate**
+**Status: NOT COMPLETE**  
+**Priority: P0/P1 before Production Candidate**
 
-### Security-Abnahme
+Final matrix must cover:
 
-- Authentifizierung,
-- Autorisierung,
-- Rollen und Policies,
-- Secret Handling,
-- Egress,
-- TLS bei externer Erreichbarkeit,
-- Dependency-/License-Checks,
-- Pfad- und Command-Escapes,
-- Rechteausweitungsversuche.
+- authentication/authorization/policies/secrets/egress/TLS;
+- dependency/license/path/command/privilege checks;
+- process/worker/runtime/host failures;
+- replay/backup/restore/migration/rollback;
+- task/worker/queue/load/RAM/disk pressure;
+- external component failure;
+- forbidden path/command/network/merge/deployment/privilege actions;
+- Forge/Hermes/ScoreSymphony/component upgrades and rollback.
 
-### Recovery-Abnahme
+---
 
-- Prozessabsturz,
-- Worker-Absturz,
-- Runtime-Restart,
-- Host-Reboot,
-- Event-Replay,
-- Backup/Restore,
-- fehlgeschlagene Migration,
-- Rollback.
+## 26. Documentation and Operational Readiness
 
-### Last-Abnahme
+**Status: ONGOING / PARTIAL**  
+**Priority: continuous; complete before Production Candidate**
 
-- viele Tasks,
-- mehrere parallele Worker,
-- volle Queues,
-- hoher RAM-Verbrauch,
-- Disk Pressure,
-- große Event-/Log-Mengen,
-- langsame oder ausgefallene externe Komponenten.
+Developer documentation must ultimately cover architecture, ADRs, V1 contracts,
+public APIs, worker/agent interfaces, component registry, security model and test
+strategy.
 
-### Agent-Sicherheits-Abnahme
+Operator documentation must cover installation, bootstrap, start/stop, update,
+backup, restore, rollback, recovery, diagnosis and runbooks.
 
-- verbotener Pfad,
-- verbotener Command,
-- nicht erlaubter Netzwerkzugriff,
-- Merge ohne Approval,
-- Deployment ohne Approval,
-- Rechteausweitung,
-- unerwarteter Worker-/Modellfehler.
+The clone-ready baseline cleanup is part of this work package, not evidence that
+all final operator documentation is finished.
 
-### Upgrade-Abnahme
+---
 
-- Forge-Update,
-- Hermes-Update,
-- ScoreSymphony-Core-Update,
-- Component-Update,
-- Migration,
-- Rollback.
+# Release gates
 
-## 26. Dokumentation und Betriebsreife
+## Gate A - Integrated Kernel
 
-Priorität: **laufend; vollständig vor Production Candidate**
+**Current status: IN PROGRESS**
 
-### Entwicklerdokumentation
+Close Work Packages 3-7 for the complete process-level vertical slice, including
+live event recovery, Forge-owned worker dispatch and durable idempotency.
 
-- Architektur,
-- ADRs,
-- V1 Contracts,
-- öffentliche APIs,
-- Agent-/Worker-Schnittstellen,
-- Component Registry,
-- Security Model,
-- Teststrategie.
+## Gate B - Recoverable Runtime
 
-### Operator-Dokumentation
+**Status: NOT REACHED**
 
-- Installation,
-- Bootstrap,
-- Start/Stop,
-- Update,
-- Backup,
-- Restore,
-- Rollback,
-- Recovery,
-- Diagnose,
-- Runbooks.
+Work Package 8 proves restart/replay/idempotency/orphan/lease recovery.
 
-### Nutzerdokumentation
+## Gate C - Operable Deployment
 
-- Control Plane,
-- Tasks und Executions,
-- Agents,
-- Research,
-- Files,
-- Approvals,
-- Components,
-- Fehler- und Statusanzeigen.
+**Status: NOT REACHED**
 
-# Release-Gates
+Work Packages 9-10 provide production security baseline and reproducible
+reference deployment.
 
-| Gate | Erforderlicher Nachweis | Stand |
-|---|---|---|
-| **Baseline** | Gepinnte, lizenzgeprüfte Quellen, Contract Runtime und grüne Baseline-CI | **Erreicht** |
-| **V1 Forge Alignment** | Forge-konformes V1, ADR-0002, vollständige CI | **Erreicht mit PR #4** |
-| **Integrated Kernel** | Hermes–Integration–Forge–Shell-Worker-E2E mit negativen Gates und Event-Recovery | Offen |
-| **Recoverable Runtime** | Restart, Replay, Idempotenz, Lease-/Workspace-Recovery und Audit ohne Doppelstarts | Offen |
-| **Operable Deployment** | Reproduzierbares Referenz-Deployment, Auth-Grundlage, Backup/Restore und Metriken | Offen |
-| **Controlled Multi-Agent** | Agent Registry, Capacity Control, mehrere Worker, unabhängiger Review und Approvals | Offen |
-| **Extensible Platform** | Control Plane und sicherer Component Manager mit Pilotkomponente | Offen |
-| **Research / Domain Ready** | Research-Provenienz, sichere Dateien und mindestens ein Fachworker | Offen |
-| **Production Candidate** | Security-, Recovery-, Lizenz-, Last-, Upgrade- und Betriebsabnahme bestanden | Offen |
+## Gate D - Controlled Multi-Agent
 
-Multi-Node beziehungsweise mehrere VPS sind **kein verpflichtendes Release-Gate**.
-Falls ein Deployment verteilt werden soll, muss das gewählte Profil separat
-benchmarkiert und gegen seine Ausfall- und Sicherheitskriterien geprüft werden.
+**Status: NOT REACHED**
 
-# Priorisiertes Backlog ab aktuellem Stand
+Work Packages 11-15 provide observability, registry, resource controls,
+additional workers and independent review.
 
-| Nr. | Arbeitspaket | Priorität | Abhängigkeit | Stand |
-|---:|---|---|---|---|
-| 1 | Monorepo-/Lizenz-Baseline | P0 | – | erledigt |
-| 2 | V1 Contract Runtime | P0 | Baseline | erledigt |
-| 3 | Forge-konforme V1-Ausrichtung / ADR-0002 | P0 | Contract Runtime | erledigt, PR #4 |
-| 4 | Historical Forge Domain Event Read API | P0 | V1 Alignment | **als Nächstes** |
-| 5 | Forge Adapter | P0 | Event Read API | offen |
-| 6 | HTTP/JSON + SSE + Recovery Transport | P0 | Forge Adapter + Event Read | offen |
-| 7 | Hermes V1 Adapter/Tools | P0 | V1 + Transport | offen |
-| 8 | Deterministischer Shell-Worker | P0 | Forge Lifecycle | offen |
-| 9 | E2E-Erfolgs- und Fehlerpfade | P0 | Adapter + Worker | offen |
-| 10 | Durable Idempotenz | P0 | E2E | offen |
-| 11 | Replay-/Crash-/Lease-/Workspace-Recovery | P0 | E2E | offen |
-| 12 | Auth/RBAC/Service Identities | P0 | E2E | offen |
-| 13 | Tool-/Pfad-/Netzwerk-/Ressourcen-Policies | P0 | Auth | offen |
-| 14 | Secret Handling und Approval Gates | P0 | Auth/Policy | offen |
-| 15 | Reproduzierbares Referenz-Deployment | P1 | Recovery + Security | offen |
-| 16 | Backup/Restore/Rollback-Tests | P1 | Deployment | offen |
-| 17 | Observability und Runbooks | P1 | Deployment | offen |
-| 18 | Agent Registry | P1 | stabile Runtime | offen |
-| 19 | Resource Scheduler / Capacity Control | P1 | Agent Registry | offen |
-| 20 | Coding-/Research-/File-/Infra-Worker-Grundlagen | P1/P2 | Registry | offen |
-| 21 | Unabhängiger Review Worker | P1 | Registry | offen |
-| 22 | Modell-/Coding-Adapter | P1 | Worker Interface | offen |
-| 23 | Control Plane Grundversion | P1 | stabile Runtime | offen |
-| 24 | Multi-Agent-Terminal | P2 | Control Plane | offen |
-| 25 | Workflow Graph | P2 | Control Plane | offen |
-| 26 | Component Manager | P1 | Security + Registry | offen |
-| 27 | Managed-external Pilot | P1 | Component Manager | offen |
-| 28 | Research Broker | P2 | stabile Plattform | offen |
-| 29 | Research Provenienz | P2 | Research Broker | offen |
-| 30 | Datei-/Workspace-Funktionen | P2 | Security + Control Plane | offen |
-| 31 | Musikwissenschaftliche/Fachworker | P2 | Worker + Research | offen |
-| 32 | ScoreSymphony-Fachanbindung | P2 | Domain Worker | offen |
-| 33 | Optionales Topologie-Benchmarking | P2 | Operable Deployment | optional |
-| 34 | Optionales Multi-Node-/Remote-Worker-Profil | P2 | Benchmark | optional |
-| 35 | Ausfalltests des gewählten Deployment-Profils | P1/P2 | Deployment | offen |
-| 36 | Security-/Load-/Upgrade-Hardening | P0/P1 | Gesamtsystem | offen |
-| 37 | Vollständige Entwickler-/Operator-/Nutzerdokumentation | P1 | laufend | offen |
-| 38 | Production-Candidate-Abnahme | P0 | alle verpflichtenden Gates | offen |
+## Gate E - Extensible Platform
 
-# Definition of Done für jedes Arbeitspaket
+**Status: NOT REACHED**
 
-Ein Arbeitspaket gilt erst als abgeschlossen, wenn:
+Work Packages 16-19 provide backend adapters, Control Plane, terminal/graph and
+safe component management.
 
-- Implementierung und Dokumentation übereinstimmen,
-- Architekturgrenzen eingehalten sind,
-- Lizenz- und Sicherheitsgrenzen eingehalten sind,
-- Unit-, Integrations- und erforderliche Negativtests grün sind,
-- relevante Fehler und Events beobachtbar sind,
-- Logs und Events keine Secrets enthalten,
-- Migration und Rollback beschrieben sind, wenn persistenter Zustand betroffen
-  ist,
-- `CURRENT_STATE.md` sachlich aktualisiert wurde,
-- der PR Abnahmekriterien und Testbelege enthält,
-- `main` reproduzierbar bleibt.
+## Gate F - Research / Domain Ready
 
-# Bewusst nicht vorziehen
+**Status: NOT REACHED**
 
-Vor dem Gate **Integrated Kernel** sind folgende Arbeiten keine blockierenden
-Prioritäten:
+Work Packages 20-23 provide provenance-aware research, secure files/workspaces,
+domain workers and ScoreSymphony application integration.
 
-- vollständige Dashboard-Neugestaltung,
-- mehrere produktive LLM-Agententypen,
-- große lokale Modelle,
-- umfangreiche Research-/Musikanalyse-Pipelines,
-- mehrere Monitoring-Produkte gleichzeitig,
-- komplizierte Multi-Node-Topologien,
-- GPU-Worker,
-- öffentliche Produktionsfreigabe.
+## Gate G - Production Candidate
 
-Sie dürfen explorativ untersucht werden, aber nicht die Fertigstellung des
-vertikalen Kernpfads verdrängen.
+**Status: NOT REACHED**
 
-# Unmittelbar nächste Pull Requests
+Work Packages 24-26 plus all preceding gates pass final security, recovery,
+load, agent-safety, upgrade and documentation acceptance.
 
-## Nächster PR – Historical Forge Domain Event Read
+---
 
-- authentifizierte read-only Route,
-- Query-/Response-Typen,
-- `after_sequence` + `limit`,
-- Ordering-/Auth-/Cursor-/Empty-Tests,
-- API-Dokumentation,
-- Changelog,
-- ggf. generierte Client-Typen.
+# Fresh-repository starting backlog
 
-## Danach – Forge + Transport Adapter
+The new GitHub repository should **not** copy the old issue list wholesale. Start
+with only the work that is actually active and near-term.
 
-- V1-Command-Mapping gegen öffentliche Forge-Oberflächen,
-- V1-Event-Projektion,
-- Live-SSE,
-- Historical Catch-up,
-- Reconnect/Replay,
-- Idempotenz-Grundlage.
+## Milestone: Integrated Kernel
 
-## Danach – Hermes + Shell-Worker Vertical Slice
+Recommended initial issues:
 
-- Hermes V1 Tools,
-- deterministischer Shell-Worker,
-- kompletter Erfolgsfall,
-- negative Gates,
-- Disconnect-/Replay-Test,
-- Integrated-Kernel-Abnahme in CI.
+1. **Live Forge SSE projection into canonical V1 events**
+2. **Reconnect and Historical Recovery handoff**
+3. **Forge-owned deterministic Shell Worker dispatch**
+4. **Durable Command Idempotency and ambiguous-submit recovery**
+5. **Process-level Hermes -> Gateway -> Forge acceptance**
+6. **Integrated Kernel full E2E release-gate test**
+7. **Runtime Security ingress binding for authenticated principal / V1 actor**
+8. **Forge authentication bootstrap and secret injection design**
+9. **CI / fresh-repository required-check recreation**
 
-# Laufende Upstream- und Lizenzpflege
+Only after the Integrated Kernel gate is nearly complete should detailed issues
+for later milestones be expanded. This avoids recreating the current repository's
+problem of dozens of overlapping future tracking issues.
 
-Forge und Hermes werden regelmäßig auf neue Commits, Releases,
-Security-Fixes, API-Änderungen und Lizenzänderungen geprüft.
+## Milestones to create now
 
-Übernahmeprozess:
+Create real GitHub milestones, in this order:
 
-1. dedizierten Upstream-Update-Branch erstellen,
-2. neuen Pin und Provenienz aktualisieren,
-3. Lizenzgrenze erneut prüfen,
-4. Baseline-, Contract-, Integrations- und E2E-Tests ausführen,
-5. ScoreSymphony-Anpassungen und Migrationsrisiken dokumentieren,
-6. erst nach Review und grüner CI mergen.
+1. Integrated Kernel
+2. Recoverable Runtime
+3. Operable Deployment
+4. Controlled Multi-Agent
+5. Extensible Platform
+6. Research / Domain Ready
+7. Production Candidate
 
-Upstream-Änderungen werden niemals automatisch ungeprüft nach `main` gemergt.
+Do not create parallel normal issues titled `Milestone: ...` unless a specific
+release-gate tracker has a distinct purpose.
 
-# Endzustand
+---
 
-Die Plattform gilt als **Production Candidate**, wenn sie unabhängig von der
-konkreten Deployment-Topologie:
+# Definition of Done for the clone-ready baseline
 
-- einen einzigen intelligenten Orchestrator besitzt,
-- Forge als kanonische Lifecycle-Authority durchsetzt,
-- Commands und Events versioniert und recoverbar transportiert,
-- Agenten mit minimalen Rechten und Ressourcenbudgets ausführt,
-- unabhängige Reviews und menschliche Approvals unterstützt,
-- sicher installierbare externe Komponenten verwaltet,
-- Research-, Datei- und Fachworker reproduzierbar betreiben kann,
-- über eine Control Plane vollständig beobachtbar und bedienbar ist,
-- Restart, Backup, Restore und Rollback getestet beherrscht,
-- Security-, Lizenz-, Last- und Upgrade-Gates besteht,
-- und auf dem gewählten Single- oder Multi-Node-Deployment reproduzierbar
-  betrieben werden kann.
+Before the current repository is archived and its working tree is used to
+initialize a fresh Git repository:
+
+- `README.md`, `ARCHITECTURE.md`, `CURRENT_STATE.md` and this roadmap describe the
+  same architecture and implementation state;
+- no document claims Historical Event Recovery or Shell Worker acceptance is
+  still unimplemented;
+- no current architecture document uses obsolete `run_id`, `start_worker`,
+  `create_worktree`, `run_tests`, `merge_task`, `retry_run` or `cancel_run` as V1
+  commands;
+- licensing/provenance files remain intact;
+- source-controlled CI/workflow files remain intact;
+- repository validation is green for the baseline commit;
+- the exact source commit used for the fresh repository is recorded in the new
+  repository README/history note;
+- old GitHub issues/PRs/branches remain in the archived repository instead of
+  being imported as active planning truth.
+
+Migration mechanics and post-create GitHub setup are defined in
+`BASELINE_HANDOFF.md`.
