@@ -52,3 +52,12 @@ jobs:
         run: docker compose --profile upstream-smoke config --quiet
       - name: Validate deployment invariants
         run: python scripts/validate_deployment.py
+
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    needs:
+      - python-quality
+      - compose-contract
+    steps:
+      - run: echo "Platform quality gates passed"
