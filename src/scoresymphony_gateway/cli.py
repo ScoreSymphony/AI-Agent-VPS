@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 from socketserver import ThreadingMixIn
 from wsgiref.simple_server import WSGIServer
 from wsgiref.simple_server import make_server
@@ -14,14 +15,27 @@ class ThreadingWSGIServer(ThreadingMixIn, WSGIServer):
     daemon_threads = True
 
 
+def _read_secret(name: str) -> str:
+    file_name = os.environ.get(f"{name}_FILE")
+    if file_name:
+        try:
+            value = Path(file_name).read_text(encoding="utf-8").strip()
+        except OSError as exc:
+            raise RuntimeError(f"{name}_FILE could not be read") from exc
+        if not value:
+            raise RuntimeError(f"{name}_FILE must not be empty")
+        return value
+
+    value = os.environ.get(name, "").strip()
+    if not value:
+        raise RuntimeError(f"{name} or {name}_FILE is required")
+    return value
+
+
 def build_application() -> GatewayApplication:
     base_url = os.environ.get("FORGE_BASE_URL", "http://127.0.0.1:3000")
-    token = os.environ.get("FORGE_BEARER_TOKEN")
-    if not token:
-        raise RuntimeError("FORGE_BEARER_TOKEN is required")
-    client_token = os.environ.get("SCORESYMPHONY_GATEWAY_BEARER_TOKEN")
-    if not client_token:
-        raise RuntimeError("SCORESYMPHONY_GATEWAY_BEARER_TOKEN is required")
+    token = _read_secret("FORGE_BEARER_TOKEN")
+    client_token = _read_secret("SCORESYMPHONY_GATEWAY_BEARER_TOKEN")
     timeout = float(os.environ.get("SCORESYMPHONY_FORGE_TIMEOUT_SECONDS", "10"))
     page_limit = int(os.environ.get("SCORESYMPHONY_EVENT_PAGE_LIMIT", "100"))
     transport = UrllibForgeHttpTransport(base_url, token, timeout_seconds=timeout)
