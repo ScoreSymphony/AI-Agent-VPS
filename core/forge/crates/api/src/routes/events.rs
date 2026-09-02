@@ -1,5 +1,8 @@
 use std::convert::Infallible;
 
+use api_types::{
+    HistoricalDomainEvent, HistoricalDomainEventsQuery, HistoricalDomainEventsResponse,
+};
 use axum::{
     extract::{Query, State},
     response::{
@@ -9,7 +12,6 @@ use axum::{
     Json,
 };
 use db::{DomainEvent, DomainEventRepo};
-use serde::{Deserialize, Serialize};
 use serde_json::json;
 use tokio_stream::{wrappers::BroadcastStream, StreamExt};
 
@@ -21,64 +23,9 @@ use crate::{
 const DEFAULT_HISTORY_LIMIT: i64 = 100;
 const MAX_HISTORY_LIMIT: i64 = 500;
 
-#[derive(Debug, Clone, Default, Deserialize)]
-pub struct EventsQuery {
-    pub after_sequence: Option<i64>,
-    pub limit: Option<i64>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct HistoricalDomainEvent {
-    pub sequence: i64,
-    pub id: String,
-    pub event_type: String,
-    pub entity_type: String,
-    pub entity_id: String,
-    pub actor_type: String,
-    pub actor_id: Option<String>,
-    pub scope_type: String,
-    pub scope_id: String,
-    pub correlation_id: String,
-    pub causation_id: Option<String>,
-    pub causation_depth: i64,
-    pub dedupe_key: Option<String>,
-    pub payload_json: String,
-    pub created_at: String,
-}
-
-impl From<DomainEvent> for HistoricalDomainEvent {
-    fn from(event: DomainEvent) -> Self {
-        Self {
-            sequence: event.sequence,
-            id: event.id,
-            event_type: event.event_type,
-            entity_type: event.entity_type,
-            entity_id: event.entity_id,
-            actor_type: event.actor_type,
-            actor_id: event.actor_id,
-            scope_type: event.scope_type,
-            scope_id: event.scope_id,
-            correlation_id: event.correlation_id,
-            causation_id: event.causation_id,
-            causation_depth: event.causation_depth,
-            dedupe_key: event.dedupe_key,
-            payload_json: event.payload_json,
-            created_at: event.created_at,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct HistoricalDomainEventsResponse {
-    pub after_sequence: i64,
-    pub limit: i64,
-    pub next_after_sequence: i64,
-    pub events: Vec<HistoricalDomainEvent>,
-}
-
 pub async fn stream_events(
     State(state): State<AppState>,
-    Query(query): Query<EventsQuery>,
+    Query(query): Query<HistoricalDomainEventsQuery>,
 ) -> Response {
     if query.after_sequence.is_some() || query.limit.is_some() {
         return match historical_events(&state, query).await {
@@ -108,7 +55,7 @@ pub async fn stream_events(
                 // EventContext is flattened and Serialize-derived, so review/cleanup/merge
                 // contexts pass through SSE without variant-specific routing here.
                 let data = serde_json::to_string(&event).ok()?;
-                Some(Ok(Event::default()
+                Some(Ok::<Event, Infallible>(Event::default()
                     .event(event_type)
                     .id(entity_id)
                     .data(data)))
@@ -121,7 +68,7 @@ pub async fn stream_events(
                     "timestamp": events::event_timestamp(),
                     "reason": error.to_string(),
                 });
-                Some(Ok(Event::default()
+                Some(Ok::<Event, Infallible>(Event::default()
                     .event(event_type)
                     .id(event_type)
                     .data(data.to_string())))
@@ -137,7 +84,7 @@ pub async fn stream_events(
 
 async fn historical_events(
     state: &AppState,
-    query: EventsQuery,
+    query: HistoricalDomainEventsQuery,
 ) -> ApiResult<Json<HistoricalDomainEventsResponse>> {
     let after_sequence = query.after_sequence.unwrap_or(0);
     if after_sequence < 0 {
@@ -165,6 +112,26 @@ async fn historical_events(
         after_sequence,
         limit,
         next_after_sequence,
-        events: events.into_iter().map(HistoricalDomainEvent::from).collect(),
+        events: events.into_iter().map(historical_domain_event).collect(),
     }))
+}
+
+fn historical_domain_event(event: DomainEvent) -> HistoricalDomainEvent {
+    HistoricalDomainEvent {
+        sequence: event.sequence,
+        id: event.id,
+        event_type: event.event_type,
+        entity_type: event.entity_type,
+        entity_id: event.entity_id,
+        actor_type: event.actor_type,
+        actor_id: event.actor_id,
+        scope_type: event.scope_type,
+        scope_id: event.scope_id,
+        correlation_id: event.correlation_id,
+        causation_id: event.causation_id,
+        causation_depth: event.causation_depth,
+        dedupe_key: event.dedupe_key,
+        payload_json: event.payload_json,
+        created_at: event.created_at,
+    }
 }
