@@ -1,16 +1,33 @@
 name: scoresymphony-agent-platform
 
+x-platform-logging: &platform-logging
+  driver: json-file
+  options:
+    max-size: "${SCORESYMPHONY_LOG_MAX_SIZE:-10m}"
+    max-file: "${SCORESYMPHONY_LOG_MAX_FILES:-3}"
+
 services:
   forge-upstream:
     profiles: ["upstream-smoke"]
     build:
       context: ./core/forge
+    init: true
     ports:
-      - "${SCORESYMPHONY_FORGE_PORT:-8080}:8080"
+      - "${SCORESYMPHONY_BIND_HOST:-127.0.0.1}:${SCORESYMPHONY_FORGE_PORT:-8080}:8080"
     volumes:
       - forge-data:/data
     environment:
-      RUST_LOG: info
+      RUST_LOG: "${SCORESYMPHONY_FORGE_LOG_LEVEL:-info}"
+    labels:
+      io.scoresymphony.component: forge
+      io.scoresymphony.role: execution-authority
+    healthcheck:
+      test: ["CMD-SHELL", "bash -ec 'exec 3<>/dev/tcp/127.0.0.1/8080'"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 30s
+    logging: *platform-logging
 
   hermes-upstream:
     profiles: ["upstream-smoke"]
@@ -18,6 +35,7 @@ services:
       context: ./core/hermes
       args:
         HERMES_GIT_SHA: b81383ec215400cbbc7d9768cf4ce45a19f9092a
+    init: true
     volumes:
       - hermes-data:/opt/data
     environment:
@@ -25,6 +43,10 @@ services:
       HERMES_GID: ${HERMES_GID:-10000}
     network_mode: host
     command: ["gateway", "run"]
+    labels:
+      io.scoresymphony.component: hermes
+      io.scoresymphony.role: orchestrator
+    logging: *platform-logging
 
 volumes:
   forge-data:
