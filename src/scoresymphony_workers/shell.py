@@ -3,6 +3,8 @@ from __future__ import annotations
 import hashlib
 import math
 import os
+import signal
+import stat
 import subprocess
 import time
 from dataclasses import dataclass, replace
@@ -233,6 +235,14 @@ class ShellWorker:
         argv = (str(executable), *command.argv[1:])
         before = self._snapshot_workspace()
 
+        popen_kwargs: dict[str, object] = {}
+        if os.name == "posix":
+            popen_kwargs["start_new_session"] = True
+        elif os.name == "nt":
+            popen_kwargs["creationflags"] = getattr(
+                subprocess, "CREATE_NEW_PROCESS_GROUP", 0
+            )
+
         try:
             process = subprocess.Popen(
                 argv,
@@ -245,6 +255,7 @@ class ShellWorker:
                 encoding="utf-8",
                 errors="replace",
                 shell=False,
+                **popen_kwargs,
             )
         except OSError as exc:
             result = ShellExecutionResult(
@@ -260,23 +271,8 @@ class ShellWorker:
 
         deadline = time.monotonic() + float(command.timeout_seconds)
         while True:
-            if cancel_event is not None and cancel_event.is_set() and process.poll() is None:
-                stdout, stderr = self._terminate_and_collect(process)
-                result = ShellExecutionResult(
-                    status=ShellExecutionStatus.CANCELLED,
-                    argv=tuple(command.argv),
-                    cwd=command.cwd,
-                    exit_code=None,
-                    stdout=stdout,
-                    stderr=stderr,
-                    error_code="cancelled",
-                )
-                return self._attach_workspace_evidence(
-                    result, before, declared_write_paths
-                )
-
             remaining = deadline - time.monotonic()
-            if remaining <= 0 and process.poll() is None:
+            if remaining <= 0:
                 stdout, stderr = self._terminate_and_collect(process)
                 result = ShellExecutionResult(
                     status=ShellExecutionStatus.TIMED_OUT,
@@ -291,16 +287,25 @@ class ShellWorker:
                     result, before, declared_write_paths
                 )
 
-            if process.poll() is not None:
-                stdout, stderr = process.communicate()
-                break
-
-            wait_seconds = min(self._CANCEL_POLL_SECONDS, max(remaining, 0.001))
+            wait_seconds = min(self._CANCEL_POLL_SECONDS, remaining)
             try:
                 stdout, stderr = process.communicate(timeout=wait_seconds)
                 break
             except subprocess.TimeoutExpired:
-                continue
+                if cancel_event is not None and cancel_event.is_set():
+                    stdout, stderr = self._terminate_and_collect(process)
+                    result = ShellExecutionResult(
+                        status=ShellExecutionStatus.CANCELLED,
+                        argv=tuple(command.argv),
+                        cwd=command.cwd,
+                        exit_code=None,
+                        stdout=stdout,
+                        stderr=stderr,
+                        error_code="cancelled",
+                    )
+                    return self._attach_workspace_evidence(
+                        result, before, declared_write_paths
+                    )
 
         status = (
             ShellExecutionStatus.SUCCEEDED
@@ -390,18 +395,19 @@ class ShellWorker:
         snapshot: dict[str, str] = {}
         for path in sorted(self._workspace_root.rglob("*")):
             relative = path.relative_to(self._workspace_root).as_posix()
+            mode = stat.S_IMODE(path.lstat().st_mode)
             if path.is_symlink():
-                snapshot[relative] = f"symlink:{os.readlink(path)}"
+                snapshot[relative] = f"symlink:{mode:o}:{os.readlink(path)}"
             elif path.is_dir():
-                snapshot[relative] = "directory"
+                snapshot[relative] = f"directory:{mode:o}"
             elif path.is_file():
                 digest = hashlib.sha256()
                 with path.open("rb") as handle:
                     for chunk in iter(lambda: handle.read(1024 * 1024), b""):
                         digest.update(chunk)
-                snapshot[relative] = f"file:{digest.hexdigest()}"
+                snapshot[relative] = f"file:{mode:o}:{digest.hexdigest()}"
             else:
-                snapshot[relative] = "other"
+                snapshot[relative] = f"other:{mode:o}"
         return snapshot
 
     @classmethod
@@ -427,19 +433,54 @@ class ShellWorker:
     def _terminate_and_collect(
         self, process: subprocess.Popen[str]
     ) -> tuple[str, str]:
-        try:
-            process.terminate()
-        except OSError:
-            pass
+        self._signal_process_group(process, force=False)
         try:
             stdout, stderr = process.communicate(timeout=self._TERMINATION_GRACE_SECONDS)
-        except subprocess.TimeoutExpired:
+        except subprocess.TimeoutExpired as first_timeout:
+            self._signal_process_group(process, force=True)
             try:
-                process.kill()
-            except OSError:
-                pass
-            stdout, stderr = process.communicate()
+                stdout, stderr = process.communicate(
+                    timeout=self._TERMINATION_GRACE_SECONDS
+                )
+            except subprocess.TimeoutExpired as final_timeout:
+                stdout = (
+                    final_timeout.stdout
+                    if final_timeout.stdout is not None
+                    else first_timeout.stdout
+                )
+                stderr = (
+                    final_timeout.stderr
+                    if final_timeout.stderr is not None
+                    else first_timeout.stderr
+                )
+                for stream in (process.stdout, process.stderr):
+                    if stream is not None:
+                        stream.close()
+                try:
+                    process.wait(timeout=self._CANCEL_POLL_SECONDS)
+                except subprocess.TimeoutExpired:
+                    pass
         return self._normalize_output(stdout), self._normalize_output(stderr)
+
+    @staticmethod
+    def _signal_process_group(
+        process: subprocess.Popen[str], *, force: bool
+    ) -> None:
+        if os.name == "posix":
+            group_signal = signal.SIGKILL if force else signal.SIGTERM
+            try:
+                os.killpg(process.pid, group_signal)
+            except ProcessLookupError:
+                pass
+            return
+
+        try:
+            if force:
+                process.kill()
+            else:
+                process.terminate()
+        except OSError:
+            pass
 
     @staticmethod
     def _path_key(path: Path) -> str:
