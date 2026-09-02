@@ -8,10 +8,12 @@ x-platform-logging: &platform-logging
 
 services:
   forge-upstream:
-    profiles: ["upstream-smoke"]
+    profiles: ["upstream-smoke", "reference"]
     build:
       context: ./core/forge
     init: true
+    restart: unless-stopped
+    stop_grace_period: 30s
     ports:
       - "${SCORESYMPHONY_BIND_HOST:-127.0.0.1}:${SCORESYMPHONY_FORGE_PORT:-8080}:8080"
     volumes:
@@ -28,6 +30,53 @@ services:
       timeout: 3s
       retries: 5
       start_period: 30s
+    cpus: "${SCORESYMPHONY_FORGE_CPUS:-2.0}"
+    mem_limit: "${SCORESYMPHONY_FORGE_MEMORY:-2g}"
+    pids_limit: 512
+    security_opt:
+      - no-new-privileges:true
+    logging: *platform-logging
+
+  gateway:
+    profiles: ["reference"]
+    build:
+      context: .
+      dockerfile: Dockerfile.gateway
+    init: true
+    restart: unless-stopped
+    stop_grace_period: 20s
+    depends_on:
+      forge-upstream:
+        condition: service_healthy
+    ports:
+      - "${SCORESYMPHONY_BIND_HOST:-127.0.0.1}:${SCORESYMPHONY_GATEWAY_PORT:-8090}:8090"
+    environment:
+      FORGE_BASE_URL: "http://forge-upstream:8080"
+      FORGE_BEARER_TOKEN: "${FORGE_BEARER_TOKEN:-}"
+      SCORESYMPHONY_GATEWAY_BEARER_TOKEN: "${SCORESYMPHONY_GATEWAY_BEARER_TOKEN:-}"
+      SCORESYMPHONY_GATEWAY_HOST: "0.0.0.0"
+      SCORESYMPHONY_GATEWAY_PORT: "8090"
+      SCORESYMPHONY_FORGE_TIMEOUT_SECONDS: "${SCORESYMPHONY_FORGE_TIMEOUT_SECONDS:-10}"
+      SCORESYMPHONY_EVENT_PAGE_LIMIT: "${SCORESYMPHONY_EVENT_PAGE_LIMIT:-100}"
+    labels:
+      io.scoresymphony.component: gateway
+      io.scoresymphony.role: integration-boundary
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8090/readyz', timeout=2).read()"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+      start_period: 20s
+    cpus: "${SCORESYMPHONY_GATEWAY_CPUS:-1.0}"
+    mem_limit: "${SCORESYMPHONY_GATEWAY_MEMORY:-512m}"
+    pids_limit: 256
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
     logging: *platform-logging
 
   hermes-upstream:
@@ -37,6 +86,8 @@ services:
       args:
         HERMES_GIT_SHA: b81383ec215400cbbc7d9768cf4ce45a19f9092a
     init: true
+    restart: unless-stopped
+    stop_grace_period: 30s
     volumes:
       - hermes-data:/opt/data
     environment:
@@ -47,6 +98,11 @@ services:
     labels:
       io.scoresymphony.component: hermes
       io.scoresymphony.role: orchestrator
+    cpus: "${SCORESYMPHONY_HERMES_CPUS:-2.0}"
+    mem_limit: "${SCORESYMPHONY_HERMES_MEMORY:-2g}"
+    pids_limit: 512
+    security_opt:
+      - no-new-privileges:true
     logging: *platform-logging
 
 volumes:
