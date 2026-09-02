@@ -15,6 +15,8 @@ dependencies = [
 
 [project.scripts]
 scoresymphony-components = "scoresymphony_control.component_registry:main"
+scoresymphony-gateway = "scoresymphony_gateway.cli:main"
+scoresymphony-hermes = "scoresymphony_hermes.cli:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
