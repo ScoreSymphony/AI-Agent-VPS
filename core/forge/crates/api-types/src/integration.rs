@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use ts_rs::TS;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateIntegrationRequest {
@@ -77,4 +78,44 @@ pub struct SyncTriggerResponse {
     pub imported: u32,
     pub skipped: u32,
     pub errors: u32,
+}
+
+/// Public query contract for durable domain-event recovery reads.
+/// `after_sequence` is exclusive; omitted values start from sequence zero.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, TS, PartialEq, Eq)]
+#[ts(export)]
+pub struct HistoricalDomainEventsQuery {
+    pub after_sequence: Option<i64>,
+    pub limit: Option<i64>,
+}
+
+/// Stable public projection of one persisted Forge domain event.
+#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
+#[ts(export)]
+pub struct HistoricalDomainEvent {
+    pub sequence: i64,
+    pub id: String,
+    pub event_type: String,
+    pub entity_type: String,
+    pub entity_id: String,
+    pub actor_type: String,
+    pub actor_id: Option<String>,
+    pub scope_type: String,
+    pub scope_id: String,
+    pub correlation_id: String,
+    pub causation_id: Option<String>,
+    pub causation_depth: i64,
+    pub dedupe_key: Option<String>,
+    pub payload_json: String,
+    pub created_at: String,
+}
+
+/// Ordered page returned by the durable historical event read mode.
+#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
+#[ts(export)]
+pub struct HistoricalDomainEventsResponse {
+    pub after_sequence: i64,
+    pub limit: i64,
+    pub next_after_sequence: i64,
+    pub events: Vec<HistoricalDomainEvent>,
 }
