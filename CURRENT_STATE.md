@@ -28,6 +28,9 @@ surface required before the first production-quality Hermes-Forge adapter.
   or merge authority are removed from V1.
 - Contract fixtures, compatibility checks, semantic rejection tests, and runtime
   tests cover the corrected vocabulary.
+- The transport-neutral deterministic shell-worker reference implementation now
+  covers predictable fixture changes, write-path policy evidence, success,
+  failure, timeout, cancellation, and explicit retry attempts without an LLM.
 - Baseline validation, Pytest, packaging checks, and GitHub Actions definitions
   remain present.
 
@@ -50,7 +53,7 @@ surface required before the first production-quality Hermes-Forge adapter.
 - Running ScoreSymphony command HTTP endpoint and SSE projection adapter.
 - Durable command idempotency integration against Forge-owned state/events.
 - Hermes-side V1 tools/adapter.
-- Minimal shell-worker end-to-end vertical slice.
+- Forge-integrated shell-worker end-to-end vertical slice.
 - Production authentication/authorization design beyond existing Forge auth.
 - Deployment, Control Plane, agent registry, managed externals, specialist
   agents, and KVM placement.
