@@ -32,12 +32,14 @@ def auth_request(
     roles=("operator",),
     action="task.create",
     scope="project-1",
+    operation_digest="sha256:operation-1",
     context=None,
 ):
     return AuthorizationRequest(
         principal=principal(*roles),
         action=action,
         resource=ResourceRef(resource_type="project", resource_id=scope, scope=scope),
+        operation_digest=operation_digest,
         context=context or {},
     )
 
@@ -68,6 +70,11 @@ def test_authorization_inputs_are_immutable() -> None:
     request = auth_request(context={"channel": "hermes"})
     with pytest.raises(TypeError):
         request.context["channel"] = "control-plane"
+
+
+def test_authorization_requires_operation_digest() -> None:
+    with pytest.raises(ValueError, match="operation_digest"):
+        auth_request(operation_digest=" ")
 
 
 def test_no_matching_rule_is_default_deny() -> None:
@@ -151,6 +158,15 @@ def test_approved_record_only_releases_exact_request_and_required_policy() -> No
     assert not approval_satisfies(
         approved,
         auth_request(context={"channel": "control-plane"}),
+        requirement,
+        now=now + timedelta(minutes=2),
+    )
+    assert not approval_satisfies(
+        approved,
+        auth_request(
+            operation_digest="sha256:different-operation",
+            context={"channel": "hermes"},
+        ),
         requirement,
         now=now + timedelta(minutes=2),
     )
