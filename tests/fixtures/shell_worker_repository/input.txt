@@ -1,0 +1,3 @@
+ScoreSymphony shell worker fixture
+alpha
+beta
