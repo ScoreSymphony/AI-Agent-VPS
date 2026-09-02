@@ -31,6 +31,12 @@ surface required before the first production-quality Hermes-Forge adapter.
 - The transport-neutral deterministic shell-worker reference implementation now
   covers predictable fixture changes, write-path policy evidence, success,
   failure, timeout, cancellation, and explicit retry attempts without an LLM.
+- Shell-worker timeout/cancel collection remains deadline-bounded when a direct
+  parent exits while descendants retain inherited pipes; POSIX invocations use
+  a dedicated process group for bounded termination.
+- Workspace write-policy evidence includes relevant file-mode changes, so a
+  mode-only mutation such as an executable-bit change cannot bypass the
+  declared-write-path check.
 - Baseline validation, Pytest, packaging checks, and GitHub Actions definitions
   remain present.
 
