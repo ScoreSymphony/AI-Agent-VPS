@@ -114,10 +114,31 @@ def validate() -> None:
     )
     require(gateway_environment.get("SCORESYMPHONY_GATEWAY_HOST") == "0.0.0.0", "Gateway must listen on its container interface")
     require(gateway_environment.get("SCORESYMPHONY_GATEWAY_PORT") == "8090", "Gateway container port must be stable")
-    require("FORGE_BEARER_TOKEN" in gateway_environment, "Gateway must receive the Forge credential through runtime configuration")
     require(
-        "SCORESYMPHONY_GATEWAY_BEARER_TOKEN" in gateway_environment,
-        "Gateway must receive its client credential through runtime configuration",
+        gateway_environment.get("FORGE_BEARER_TOKEN_FILE") == "/run/secrets/forge_bearer_token",
+        "Gateway must read the Forge credential from a mounted secret file",
+    )
+    require(
+        gateway_environment.get("SCORESYMPHONY_GATEWAY_BEARER_TOKEN_FILE") == "/run/secrets/gateway_bearer_token",
+        "Gateway must read its client credential from a mounted secret file",
+    )
+    gateway_secrets = set(gateway.get("secrets", []))
+    require(
+        {"forge_bearer_token", "gateway_bearer_token"}.issubset(gateway_secrets),
+        "Gateway must mount both reference credentials as Compose secrets",
+    )
+
+    top_level_secrets = compose.get("secrets", {})
+    require(isinstance(top_level_secrets, dict), "compose.yaml must define reference secrets")
+    require(
+        top_level_secrets.get("forge_bearer_token", {}).get("file")
+        == "${SCORESYMPHONY_FORGE_TOKEN_FILE:-./.runtime/secrets/forge_bearer_token}",
+        "Forge bearer secret must come from the configured local secret file",
+    )
+    require(
+        top_level_secrets.get("gateway_bearer_token", {}).get("file")
+        == "${SCORESYMPHONY_GATEWAY_TOKEN_FILE:-./.runtime/secrets/gateway_bearer_token}",
+        "Gateway bearer secret must come from the configured local secret file",
     )
 
     depends_on = gateway.get("depends_on", {}).get("forge-upstream", {})
