@@ -3,6 +3,8 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import stat
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -44,6 +46,34 @@ def _environment() -> int:
     return 0
 
 
+def _retry_once(marker_name: str, output_name: str) -> int:
+    marker = Path(marker_name)
+    if not marker.exists():
+        marker.write_text("retry-required\n", encoding="utf-8", newline="\n")
+        print("retry required", file=sys.stderr)
+        return 75
+    Path(output_name).write_text("retry succeeded\n", encoding="utf-8", newline="\n")
+    print("retry succeeded")
+    return 0
+
+
+def _spawn_descendant_and_exit(seconds: str) -> int:
+    delay = float(seconds)
+    subprocess.Popen(
+        [sys.executable, "-c", f"import time; time.sleep({delay!r})"],
+        stdin=subprocess.DEVNULL,
+    )
+    print("spawned descendant")
+    return 0
+
+
+def _toggle_executable(path_name: str) -> int:
+    path = Path(path_name)
+    path.chmod(path.stat().st_mode ^ stat.S_IXUSR)
+    print("toggled executable bit")
+    return 0
+
+
 def main(argv: list[str]) -> int:
     if not argv:
         return 64
@@ -62,6 +92,12 @@ def main(argv: list[str]) -> int:
         time.sleep(float(arguments[0]))
         print("finished sleeping")
         return 0
+    if operation == "retry-once" and len(arguments) == 2:
+        return _retry_once(arguments[0], arguments[1])
+    if operation == "spawn-descendant-and-exit" and len(arguments) == 1:
+        return _spawn_descendant_and_exit(arguments[0])
+    if operation == "toggle-executable" and len(arguments) == 1:
+        return _toggle_executable(arguments[0])
 
     return 64
 
