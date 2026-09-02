@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import sys
+import time
 from pathlib import Path
 from threading import Event, Timer
 
@@ -105,6 +107,29 @@ def test_timeout_is_structured_and_does_not_raise(tmp_path: Path) -> None:
     assert result.exit_code is None
     assert result.error_code == "timeout"
     assert result.changed_paths == ()
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX process-group semantics")
+def test_timeout_remains_bounded_after_parent_exits_with_live_descendant(
+    tmp_path: Path,
+) -> None:
+    workspace = _workspace(tmp_path)
+    started = time.monotonic()
+
+    result = _worker(workspace).execute(
+        _fixture_command(
+            "spawn-descendant-and-exit",
+            "2.0",
+            timeout_seconds=0.10,
+        )
+    )
+    elapsed = time.monotonic() - started
+
+    assert result.status is ShellExecutionStatus.TIMED_OUT
+    assert result.exit_code is None
+    assert result.error_code == "timeout"
+    assert "spawned descendant" in result.stdout
+    assert elapsed < 1.5
 
 
 def test_cancel_is_structured_and_terminates_the_running_process(tmp_path: Path) -> None:
@@ -220,6 +245,25 @@ def test_worker_reports_undeclared_workspace_changes_as_policy_violation(tmp_pat
     assert result.exit_code == 0
     assert result.error_code == "path_policy_violation"
     assert result.changed_paths == ("output.txt",)
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX executable-bit semantics")
+def test_worker_reports_undeclared_mode_only_change_as_policy_violation(
+    tmp_path: Path,
+) -> None:
+    workspace = _workspace(tmp_path)
+    source = workspace / "input.txt"
+    before_bytes = source.read_bytes()
+
+    result = _worker(workspace).execute(
+        _fixture_command("toggle-executable", "input.txt")
+    )
+
+    assert source.read_bytes() == before_bytes
+    assert result.status is ShellExecutionStatus.FAILED
+    assert result.exit_code == 0
+    assert result.error_code == "path_policy_violation"
+    assert result.changed_paths == ("input.txt",)
 
 
 def test_worker_rejects_non_allowlisted_executable(tmp_path: Path) -> None:
