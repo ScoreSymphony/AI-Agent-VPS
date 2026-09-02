@@ -233,6 +233,18 @@ class ShellWorker:
             command.declared_write_paths
         )
         argv = (str(executable), *command.argv[1:])
+
+        if cancel_event is not None and cancel_event.is_set():
+            return ShellExecutionResult(
+                status=ShellExecutionStatus.CANCELLED,
+                argv=tuple(command.argv),
+                cwd=command.cwd,
+                exit_code=None,
+                stdout="",
+                stderr="",
+                error_code="cancelled",
+            )
+
         before = self._snapshot_workspace()
 
         popen_kwargs: dict[str, object] = {}
