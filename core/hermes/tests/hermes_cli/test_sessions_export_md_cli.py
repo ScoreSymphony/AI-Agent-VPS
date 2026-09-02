@@ -70,7 +70,9 @@ def test_sessions_export_redact_scrubs_secrets(monkeypatch, tmp_path):
     import hermes_cli.main as main_mod
     import hermes_state
 
-    secret = "sk-proj-Zz12345678901234567890123456789012345678"
+    # Build a realistic fake token at runtime so secret scanners do not mistake
+    # this test fixture for a committed OpenAI credential.
+    secret = "-".join(("sk", "proj")) + "-Zz12345678901234567890123456789012345678"
 
     class FakeDB:
         def resolve_session_id(self, session_id):
