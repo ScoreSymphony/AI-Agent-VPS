@@ -41,11 +41,17 @@ def test_forge_healthcheck_is_transport_liveness_only(repo_root: Path) -> None:
 
 
 def test_reference_gateway_is_private_dependency_aware_and_hardened(repo_root: Path) -> None:
-    gateway = load_compose(repo_root)["services"]["gateway"]
+    compose = load_compose(repo_root)
+    gateway = compose["services"]["gateway"]
     assert "reference" in gateway["profiles"]
     assert gateway["build"] == {"context": ".", "dockerfile": "Dockerfile.gateway"}
     assert "${SCORESYMPHONY_BIND_HOST:-127.0.0.1}:${SCORESYMPHONY_GATEWAY_PORT:-8090}:8090" in gateway["ports"]
     assert gateway["environment"]["FORGE_BASE_URL"] == "http://forge-upstream:8080"
+    assert gateway["environment"]["FORGE_BEARER_TOKEN_FILE"] == "/run/secrets/forge_bearer_token"
+    assert gateway["environment"]["SCORESYMPHONY_GATEWAY_BEARER_TOKEN_FILE"] == "/run/secrets/gateway_bearer_token"
+    assert {"forge_bearer_token", "gateway_bearer_token"}.issubset(set(gateway["secrets"]))
+    assert compose["secrets"]["forge_bearer_token"]["file"] == "${SCORESYMPHONY_FORGE_TOKEN_FILE:-./.runtime/secrets/forge_bearer_token}"
+    assert compose["secrets"]["gateway_bearer_token"]["file"] == "${SCORESYMPHONY_GATEWAY_TOKEN_FILE:-./.runtime/secrets/gateway_bearer_token}"
     assert gateway["depends_on"]["forge-upstream"]["condition"] == "service_healthy"
     probe = " ".join(str(part) for part in gateway["healthcheck"]["test"]).lower()
     assert "/readyz" in probe
@@ -76,8 +82,8 @@ def test_example_environment_keeps_reference_private_and_bounded(repo_root: Path
     assert "SCORESYMPHONY_FORGE_MEMORY=2g" in env_example
     assert "SCORESYMPHONY_GATEWAY_CPUS=1.0" in env_example
     assert "SCORESYMPHONY_GATEWAY_MEMORY=512m" in env_example
-    assert "FORGE_BEARER_TOKEN=replace-with-local-forge-token" in env_example
-    assert "SCORESYMPHONY_GATEWAY_BEARER_TOKEN=replace-with-local-gateway-token" in env_example
+    assert "SCORESYMPHONY_FORGE_TOKEN_FILE=.runtime/secrets/forge_bearer_token" in env_example
+    assert "SCORESYMPHONY_GATEWAY_TOKEN_FILE=.runtime/secrets/gateway_bearer_token" in env_example
     assert "SCORESYMPHONY_LOG_MAX_SIZE=10m" in env_example
     assert "SCORESYMPHONY_LOG_MAX_FILES=3" in env_example
 
@@ -88,7 +94,7 @@ def test_reference_operational_assets_exist(repo_root: Path) -> None:
     assert helper.is_file()
     assert runbook.is_file()
     helper_text = helper.read_text(encoding="utf-8")
-    for operation in ("preflight", "start", "stop", "status", "diagnose", "backup", "restore"):
+    for operation in ("init-secrets", "preflight", "start", "stop", "status", "diagnose", "backup", "restore"):
         assert f'"{operation}"' in helper_text
     runbook_text = runbook.read_text(encoding="utf-8")
     for section in ("Backup", "Restore", "Upgrade procedure", "Rollback procedure", "Reverse proxy and TLS"):
