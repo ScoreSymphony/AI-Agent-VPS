@@ -233,6 +233,15 @@ class ShellWorker:
             command.declared_write_paths
         )
         argv = (str(executable), *command.argv[1:])
+        before = self._snapshot_workspace()
+
+        popen_kwargs: dict[str, object] = {}
+        if os.name == "posix":
+            popen_kwargs["start_new_session"] = True
+        elif os.name == "nt":
+            popen_kwargs["creationflags"] = getattr(
+                subprocess, "CREATE_NEW_PROCESS_GROUP", 0
+            )
 
         if cancel_event is not None and cancel_event.is_set():
             return ShellExecutionResult(
