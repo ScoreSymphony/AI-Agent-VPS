@@ -2,6 +2,8 @@
 
 <!-- What concrete problem or roadmap item does this PR address? -->
 
+Linked issue/work item:
+
 ## Scope
 
 <!-- What is intentionally included and excluded? -->
@@ -22,7 +24,13 @@ Commands/checks run:
 - [ ] Relevant unit tests
 - [ ] Relevant integration/contract tests
 - [ ] Repository validation
+- [ ] E2E tests, when an authoritative E2E suite exists and is affected
 - [ ] Additional checks listed below
+
+Required repository gates after CI:
+
+- [ ] `Platform quality / required-quality-gate`
+- [ ] `Security and dependency policy / required-security-gate`
 
 Results/evidence:
 
