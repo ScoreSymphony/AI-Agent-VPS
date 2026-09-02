@@ -108,10 +108,12 @@ pub async fn stream_events(
                 // EventContext is flattened and Serialize-derived, so review/cleanup/merge
                 // contexts pass through SSE without variant-specific routing here.
                 let data = serde_json::to_string(&event).ok()?;
-                Some(Ok(Event::default()
-                    .event(event_type)
-                    .id(entity_id)
-                    .data(data)))
+                Some(Ok::<Event, Infallible>(
+                    Event::default()
+                        .event(event_type)
+                        .id(entity_id)
+                        .data(data),
+                ))
             }
             Err(error) => {
                 let event_type = "events.resync_required";
@@ -121,10 +123,12 @@ pub async fn stream_events(
                     "timestamp": events::event_timestamp(),
                     "reason": error.to_string(),
                 });
-                Some(Ok(Event::default()
-                    .event(event_type)
-                    .id(event_type)
-                    .data(data.to_string())))
+                Some(Ok::<Event, Infallible>(
+                    Event::default()
+                        .event(event_type)
+                        .id(event_type)
+                        .data(data.to_string()),
+                ))
             }
         });
     Sse::new(futures_util::StreamExt::take_until(
