@@ -4,8 +4,10 @@ Updated: 2026-09-02
 
 ## Current objective
 
-Finish the verified V1 boundary and provide the minimum Forge public recovery
-surface required before the first production-quality Hermes-Forge adapter.
+Build the first production-quality ScoreSymphony-to-Forge adapter on top of the
+verified V1 boundary and the now-available authenticated Forge historical event
+read surface, while independent worker, security, and platform-quality work can
+continue without changing Forge lifecycle ownership.
 
 ## Implemented in this branch
 
@@ -17,8 +19,7 @@ surface required before the first production-quality Hermes-Forge adapter.
 - Read/query concerns are separated from the command plane.
 - Parsed nested contract data is recursively read-only after validation.
 - Terminal command events require command causation.
-- ADR-0001 accurately describes HTTP/JSON + SSE as the live transport without
-  claiming the current SSE feed already provides durable historical replay.
+- ADR-0001 accurately describes HTTP/JSON + SSE as the live transport.
 - ADR-0002 is accepted and aligns V1 to verified Forge lifecycle operations.
 - `create_task` carries explicit Forge `project_id` scope.
 - Task mutations carry the expected Forge task `version`.
@@ -26,8 +27,15 @@ surface required before the first production-quality Hermes-Forge adapter.
   `execution_id` / execution terminology.
 - Commands that would bypass or duplicate Forge workspace, test, review, worker,
   or merge authority are removed from V1.
-- Contract fixtures, compatibility checks, semantic rejection tests, and runtime
-  tests cover the corrected vocabulary.
+- Forge now has an authenticated public historical domain-event read mode backed
+  by its persisted domain events, with route-level tests merged in PR #10.
+- Security contract primitives now define principals, credentials, resource
+  scopes, authorization requests/decisions, approval records, and shared ports.
+- Deterministic reference policy semantics are default-deny with precedence
+  `DENY > REQUIRE_APPROVAL > ALLOW`.
+- Approval validation binds approval to the exact authorization request and
+  required policy, supports expiry, defaults to no self-approval, and models
+  consumed approvals for replay prevention.
 - Baseline validation, Pytest, packaging checks, and GitHub Actions definitions
   remain present.
 
@@ -39,40 +47,48 @@ surface required before the first production-quality Hermes-Forge adapter.
 - Forge execution retry/cancel has public execution endpoints.
 - Forge live events include task, workspace, execution, review, and merge
   lifecycle information that can be normalized into V1.
-- Forge `/api/v1/events` is a broadcast SSE stream and signals
+- Forge `/api/v1/events` remains the live broadcast SSE stream and signals
   `events.resync_required` on lag.
-- Forge internally persists ordered domain events and consumer cursors, but no
-  equivalent public historical cursor-read endpoint exists yet.
+- Forge also exposes the authenticated historical domain-event read capability
+  required for adapter recovery after a sequence cursor.
+- The V1 command `actor` is asserted command data and is not authentication
+  evidence; runtime ingress must bind it to an authenticated principal.
 
 ## Not implemented yet
 
-- Authenticated public Forge historical domain-event read/recovery endpoint.
 - Running ScoreSymphony command HTTP endpoint and SSE projection adapter.
 - Durable command idempotency integration against Forge-owned state/events.
 - Hermes-side V1 tools/adapter.
 - Minimal shell-worker end-to-end vertical slice.
-- Production authentication/authorization design beyond existing Forge auth.
+- Production authentication middleware and credential provisioning.
+- Persistent RBAC/policy configuration, role bindings, approval storage, atomic
+  approval consumption, and security audit storage.
 - Deployment, Control Plane, agent registry, managed externals, specialist
   agents, and KVM placement.
 
 ## Next work package
 
-Add the smallest authenticated Forge public API surface that can read ordered
-persisted domain events after a sequence cursor. Follow the nested Forge rules:
+The critical path is now the ScoreSymphony Forge adapter and transport runtime:
 
-1. define stable API response/query types;
-2. implement a read-only authenticated route backed by `DomainEventRepo`;
-3. cover ordering, cursor, limit, authentication, and empty-result behavior;
-4. document the endpoint in Forge API docs and changelog;
-5. update generated TypeScript types if the public DTO is exported;
-6. keep existing live `/api/v1/events` SSE behavior unchanged.
+1. map each V1 command only to verified public Forge operations;
+2. normalize live Forge events into V1 events;
+3. use the authenticated historical event read for cursor recovery/resync;
+4. preserve command causation, correlation, and explicit adapter failures;
+5. cover live plus recovery behavior with transport tests;
+6. keep Forge as the sole lifecycle authority.
 
-After that endpoint is proven, implement the ScoreSymphony adapter against the
-corrected V1 contract and the public Forge surfaces only.
+In parallel, the security work can proceed without editing `core/forge`:
+
+1. bind authenticated principals to V1 actor assertions at ingress;
+2. add persistent role/policy configuration behind the security ports;
+3. add persistent approvals with atomic approved-to-consumed transition;
+4. add secret-safe audit events;
+5. prove denied or unapproved requests never reach the Forge adapter.
 
 ## Blockers
 
-The V1-to-Forge command mapping is no longer a blocker. Production-grade event
-recovery remains blocked until the selected authenticated historical read
-surface is implemented and tested. The PR must not be merged without a full
-repository CI pass.
+The historical recovery surface is no longer the adapter blocker. The remaining
+critical-path risk is correct adapter/runtime integration across command, live
+event, and recovery paths. Security contracts are prepared, but production auth,
+policy persistence, approvals, and audit wiring must not be described as
+operational until those integrations and tests exist.
