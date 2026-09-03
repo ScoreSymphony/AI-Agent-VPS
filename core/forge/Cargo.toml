@@ -9,6 +9,7 @@ members = [
     "crates/services",
     "crates/executors",
     "crates/cli-adapters",
+    "crates/executor-sidecar",
     "crates/workspace",
     "crates/git",
     "crates/review",

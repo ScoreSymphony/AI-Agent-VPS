@@ -66,6 +66,12 @@ jobs:
       - name: Test historical domain event API
         run: cargo test -p api --test domain_events
 
+      - name: Check executor sidecar
+        run: cargo check -p executor-sidecar --all-targets
+
+      - name: Test executor sidecar
+        run: cargo test -p executor-sidecar
+
       - name: Report Cargo.lock drift
         if: always()
         run: git diff -- Cargo.lock
